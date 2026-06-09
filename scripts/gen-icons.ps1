@@ -33,10 +33,13 @@ function New-AppIcon([int]$Size) {
 }
 
 # Pre-rendered raster sizes Tauri references in tauri.conf.json.
+# `icon-source.png` is the 1024×1024 master `tauri icon` can regenerate
+# the full set from on any platform (incl. real .icns on macOS CI runners).
 $sizes = @{
-  '32x32.png'      = 32
-  '128x128.png'    = 128
-  '128x128@2x.png' = 256
+  '32x32.png'       = 32
+  '128x128.png'     = 128
+  '128x128@2x.png'  = 256
+  'icon-source.png' = 1024
 }
 foreach ($name in $sizes.Keys) {
   $bmp = New-AppIcon $sizes[$name]

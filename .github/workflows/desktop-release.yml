@@ -76,6 +76,15 @@ jobs:
       - name: Install npm deps
         run: npm install
 
+      # Regenerate platform-specific icons from the source PNG on every
+      # runner. `icon-source.png` is a 1024x1024 master committed to the
+      # repo; `tauri icon` produces a real .icns on macOS, real .ico on
+      # Windows, and a complete PNG set everywhere. The placeholder
+      # icon.icns that ships in git is a tar-friendly PNG-with-extension
+      # and would fail the macOS bundler — this step replaces it.
+      - name: Regenerate platform icons
+        run: npx @tauri-apps/cli icon src-tauri/icons/icon-source.png --output src-tauri/icons
+
       - name: Build the React shell
         run: npm run build:web
 
@@ -104,7 +113,11 @@ jobs:
             Desktop clients with the updater already configured will pick
             this up automatically the next time they're launched. Browser
             users will see the new bundle on next reload.
-          releaseDraft: false
+          # Draft: the 4 matrix jobs all append to the same draft release.
+          # Hit Publish in the GitHub UI once they're all green — that's
+          # when the Tauri updater's `releases/latest/...` endpoint starts
+          # serving the new bundle.
+          releaseDraft: true
           includeUpdaterJson: true
           updaterJsonPreferNsis: false
           args: --target ${{ matrix.target }}
