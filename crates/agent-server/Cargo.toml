@@ -1,0 +1,31 @@
+[package]
+name = "agent-server"
+description = "Headless HTTP+WS server for Claude Agent Desktop. Runs in an LXC; serves Tauri clients and a browser web UI."
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "agent-server"
+path = "src/main.rs"
+
+[dependencies]
+agent-core = { path = "../agent-core" }
+
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+futures-util = { workspace = true }
+base64 = { workspace = true }

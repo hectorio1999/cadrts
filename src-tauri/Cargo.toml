@@ -1,0 +1,40 @@
+[package]
+name = "claude-agent-desktop"
+description = "Claude Agent Desktop — a local-first, subscription-billed agent shell"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "claude_agent_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "claude-agent-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.0.4", features = [] }
+
+[dependencies]
+agent-core = { path = "../crates/agent-core" }
+
+tauri = { version = "2.1.1", features = [] }
+tauri-plugin-opener = "2.2.5"
+tauri-plugin-dialog = "2.0.1"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

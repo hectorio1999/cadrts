@@ -1,0 +1,123 @@
+# GitHub Actions: build signed Claude Agent Desktop binaries for macOS, Windows, Linux.
+#
+# Triggered by:
+#   - Push of a `v*` tag → produces a release with attached .dmg / .msi / .AppImage
+#   - Manual `workflow_dispatch` → artifacts attached to the run, no release
+#
+# Secrets you need to set in repo Settings → Secrets and variables → Actions:
+#   APPLE_CERTIFICATE             base64-encoded Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD    password for that .p12
+#   APPLE_SIGNING_IDENTITY        e.g. "Developer ID Application: Hector Rosario (TEAMID)"
+#   APPLE_ID                      Apple ID email for notarisation
+#   APPLE_PASSWORD                app-specific password (not your iCloud password)
+#   APPLE_TEAM_ID                 10-char team id
+#
+# Code-signing on macOS is optional for personal use — Tauri will produce an
+# unsigned .dmg if the cert secrets are absent. Unsigned dmg requires a
+# right-click → Open the first time but otherwise works fine.
+
+name: desktop-release
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            label: macos-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            label: macos-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: windows-x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            label: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ matrix.label }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Linux deps (webkit2gtk for Tauri)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install npm deps
+        run: npm install
+
+      - name: Build the React shell
+        run: npm run build:web
+
+      - name: Tauri build (signed if certs present)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # Tauri updater bundle signing — REQUIRED so the auto-updater will
+          # accept the new build. Generate locally with `tauri signer
+          # generate`, then set both secrets in repo settings.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # macOS code signing + notarisation — leave blank for an unsigned
+          # build (works for personal use, triggers Gatekeeper warning once).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Claude Agent Desktop ${{ github.ref_name }}"
+          releaseBody: |
+            Auto-built artefacts for **${{ matrix.label }}**.
+
+            Desktop clients with the updater already configured will pick
+            this up automatically the next time they're launched. Browser
+            users will see the new bundle on next reload.
+          releaseDraft: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: false
+          args: --target ${{ matrix.target }}
+
+      - name: Upload artefact (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-agent-desktop-${{ matrix.label }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app.tar.gz
+          if-no-files-found: warn
+          retention-days: 14

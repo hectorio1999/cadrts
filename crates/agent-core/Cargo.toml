@@ -1,0 +1,38 @@
+[package]
+name = "agent-core"
+description = "Transport-agnostic agent loop for Claude Agent Desktop. Wraps the Claude Code CLI in headless stream-json mode."
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "agent_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "agent-repl"
+path = "src/bin/agent_repl.rs"
+
+[[bin]]
+name = "remote-repl"
+path = "src/bin/remote_repl.rs"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+dirs = { workspace = true }
+async-trait = { workspace = true }
+gray_matter = { workspace = true }
+walkdir = { workspace = true }
+rusqlite = { workspace = true }
+reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }

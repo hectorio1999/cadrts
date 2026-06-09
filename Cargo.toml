@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/agent-core",
+    "crates/agent-server",
+    "src-tauri",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["Hector Rosario"]
+rust-version = "1.77"
+
+[workspace.dependencies]
+# Shared by both crates so versions cannot drift.
+tokio = { version = "1.41", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+async-trait = "0.1"
+gray_matter = "0.2"
+walkdir = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+futures-util = "0.3"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

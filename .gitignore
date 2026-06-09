@@ -1,0 +1,47 @@
+# Node
+node_modules/
+dist/
+.vite/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+target/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local agent data (NEVER commit — may contain transcripts, tool output)
+.local/
+*.sqlite
+*.sqlite-*
+
+# Env
+.env
+.env.local
+
+# Local-only — both contain RTS-specific operational context (probe
+# transcripts; persona files with tenant + retainer specifics). The deployed
+# persona lives in /home/cad/.cad/ on the LXC, not in git. The repo
+# itself is the generic agent runtime — anyone can fork it and write their
+# own seed for their own LXC.
+probes/
+seed/
+
+# Build/test artifacts
+*.tar.gz
+*.log
+out.log
+err.log
+srv.log
+srv-err.log
+app.log
+app-err.log
+
+# Tauri signing keys (NEVER commit these — they sign every release)
+*.key
+~/.tauri/
+.tauri-signer/
