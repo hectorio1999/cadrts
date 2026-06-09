@@ -10,9 +10,10 @@ import SkillsManager from "./components/SkillsManager";
 import StatusBar from "./components/StatusBar";
 import UpdateBadge from "./components/UpdateBadge";
 import WebLogin from "./components/WebLogin";
-import { authStatus } from "./lib/ipc";
+import { authStatus, getConfig, testRemoteConnection } from "./lib/ipc";
 import { isTauri } from "./lib/runtime";
 import { useStore } from "./lib/store";
+import type { AuthStatus } from "./lib/types";
 
 export default function App() {
   const setAuth = useStore((s) => s.setAuth);
@@ -36,12 +37,36 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Poll auth status periodically — if the user signs in via the launched
-  // `claude login` window, this picks it up without a page reload.
+  // Boot/poll the right gate based on the configured transport.
+  //
+  // - **Local** (or browser): keep the historical behaviour — read
+  //   `~/.claude/.credentials.json` via the `auth_status` Tauri command (or
+  //   probe the server in the browser bundle). The local file is the
+  //   credential the spawned `claude` will actually use, so it must exist.
+  //
+  // - **Remote**: the server has its own credentials in `/home/<user>/.claude/`
+  //   on the LXC; this client machine doesn't need any Claude session of
+  //   its own. Skip the local file check entirely and just probe the
+  //   server with the configured bearer token. Fixes the "stub credentials
+  //   file" workaround that the Mac install needed.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
       try {
+        const cfg = await getConfig();
+        if (cfg.transport.mode === "remote") {
+          const probe = await testRemoteConnection(cfg.transport.base_url, cfg.transport.token);
+          const synthesized: AuthStatus = {
+            authenticated: probe.ok,
+            subscription_type: probe.ok ? "remote" : null,
+            expires_at: null,
+            scopes: null,
+            credential_path: null,
+            reason: probe.error,
+          };
+          if (alive) setAuth(synthesized);
+          return;
+        }
         const s = await authStatus();
         if (alive) setAuth(s);
       } catch {

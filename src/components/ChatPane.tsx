@@ -15,6 +15,7 @@ export default function ChatPane() {
   const session = useStore((s) => s.session);
   const handleEnvelope = useStore((s) => s.handleEnvelope);
   const appendUserMessage = useStore((s) => s.appendUserMessage);
+  const clearClaudeSessionId = useStore((s) => s.clearClaudeSessionId);
 
   const [input, setInput] = useState("");
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -89,6 +90,24 @@ export default function ChatPane() {
       </div>
 
       <div className="border-t border-ink-600 bg-ink-800/40 px-4 py-3">
+        {/* Thin meta strip — only shown when we have an upstream session.
+            Lets the user reset the conversation thread server-side without
+            wiping the visible history. handleEnvelope also auto-fires this
+            on auth/resume errors, so this is just the manual escape hatch. */}
+        {session.claude_session_id && !streaming && (
+          <div className="mb-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+            <span>
+              upstream: <span className="text-zinc-400">{session.claude_session_id.slice(0, 8)}…</span>
+            </span>
+            <button
+              onClick={() => clearClaudeSessionId()}
+              className="hover:text-zinc-300"
+              title="Start a fresh upstream conversation (keep visible history)"
+            >
+              ↻ reset thread
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             ref={taRef}

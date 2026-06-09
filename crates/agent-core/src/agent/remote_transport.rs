@@ -33,7 +33,10 @@ pub struct RemoteConfig {
     pub base_url: String,
     /// Server-side bearer (matches `CAD_SERVER_TOKEN` on the server).
     pub bearer_token: String,
-    /// Override for the credentials path. None = `~/.claude/.credentials.json`.
+    /// Reserved. v0.1 used this to override the per-turn upload path; v0.2+
+    /// no longer reads or uploads credentials from the client, so this field
+    /// is kept only for API stability and may be dropped in v0.3.
+    #[allow(dead_code)]
     pub credentials_path: Option<PathBuf>,
 }
 
@@ -86,17 +89,6 @@ impl RemoteTransport {
         Ok(format!("{ws}{path}"))
     }
 
-    fn load_credentials(&self) -> Result<String> {
-        let path = match &self.cfg.credentials_path {
-            Some(p) => p.clone(),
-            None => dirs::home_dir()
-                .ok_or_else(|| anyhow!("no home dir"))?
-                .join(".claude")
-                .join(".credentials.json"),
-        };
-        std::fs::read_to_string(&path)
-            .with_context(|| format!("read {}", path.display()))
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -107,7 +99,13 @@ struct StartTurnBody<'a> {
     permission_mode: Option<&'a str>,
     allowed_tools: Option<&'a [String]>,
     cwd: Option<&'a str>,
-    credentials_json: String,
+    /// Omitted entirely. The server uses its own credentials file (see
+    /// the multi-tenant story documented in `agent-server/src/api.rs`).
+    /// This `Option<&'static str>` is always `None` so the field
+    /// serialises as `null` (or is skipped if `serde(skip_serializing_if)`
+    /// is added later) — keeps the wire schema explicit while making it
+    /// clear we never carry a credential.
+    credentials_json: Option<&'a str>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,7 +137,11 @@ enum WireEnvelope {
 #[async_trait::async_trait]
 impl AgentTransport for RemoteTransport {
     async fn start_turn(&self, req: TurnRequest) -> Result<TurnHandle> {
-        let creds = self.load_credentials()?;
+        // No credential read on the client side. The server holds the
+        // Claude OAuth session; clients only need the bearer token that
+        // gates server access. Removed for v0.2 — fixes the macOS Keychain
+        // paper-cut and the multi-machine token-rotation issue (refresh
+        // tokens get burned when multiple machines upload snapshots).
 
         // Mint a turn_id here — RemoteTransport's caller may not know about
         // them. CliTransport doesn't surface this because each child IS the turn.
@@ -153,7 +155,7 @@ impl AgentTransport for RemoteTransport {
             permission_mode: perm,
             allowed_tools: req.allowed_tools.as_deref(),
             cwd: req.cwd.as_deref(),
-            credentials_json: creds,
+            credentials_json: None,
         };
 
         let resp: StartTurnResp = self

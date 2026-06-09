@@ -59,6 +59,11 @@ type State = {
 
   handleEnvelope: (env: AgentEventEnvelope) => void;
   resetSession: () => void;
+  /** Drop the upstream `claude_session_id` only — keep the visible chat
+   *  history intact. Used when a turn comes back with an auth/resume
+   *  error so the *next* message starts a fresh upstream conversation
+   *  without nuking what the user is reading on screen. */
+  clearClaudeSessionId: () => void;
 };
 
 function makeSession(): Session {
@@ -205,10 +210,38 @@ export const useStore = create<State>((set, get) => ({
       selectedToolRunId: null,
     }),
 
+  clearClaudeSessionId: () =>
+    set((s) => ({ session: { ...s.session, claude_session_id: null } })),
+
   // Single sink for backend envelopes. ChatPane wires this to startTurn().
   handleEnvelope: (env) => {
     const s = get();
     if (env.kind === "outcome") {
+      // Auto-recover from broken upstream sessions. The most common shapes:
+      //   - "Failed to authenticate. API Error: 401 ..."  (Anthropic rejected the token)
+      //   - "session not found" / claude couldn't --resume an id we cached
+      //   - empty/degenerate final text from --resume against a gone HOME
+      // In all these cases the cached `claude_session_id` is poisoned;
+      // dropping it makes the *next* message start a fresh upstream
+      // conversation without the user having to hit "+ new" manually.
+      // We keep the visible message history so they can read the error
+      // and just retype.
+      const ft = env.outcome.final_text ?? "";
+      const looksAuthBroken =
+        env.outcome.is_error &&
+        (/(?:401|Invalid (?:bearer|authentication)|authentication credentials|session not found)/i.test(ft));
+      if (looksAuthBroken) {
+        // Don't capture the outcome's session_id here — it'd just re-poison the cache.
+        set({
+          session: { ...s.session, claude_session_id: null, last_at: Date.now() },
+          lastOutcome: env.outcome,
+          streaming: false,
+        });
+        const last = s.messages.findLast?.((m) => m.role === "assistant" && !m.done);
+        if (last) s.finishAssistantMessage(last.id);
+        return;
+      }
+
       // Capture the upstream claude session_id so subsequent turns resume the conversation.
       const sid = env.outcome.session_id;
       const nextSession = sid
