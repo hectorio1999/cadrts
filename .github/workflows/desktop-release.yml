@@ -91,19 +91,22 @@ jobs:
       - name: Tauri build (signed if certs present)
         uses: tauri-apps/tauri-action@v0
         env:
+          # Required so tauri-action can create / append to a GitHub Release.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Tauri updater bundle signing — REQUIRED so the auto-updater will
           # accept the new build. Generate locally with `tauri signer
           # generate`, then set both secrets in repo settings.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code signing + notarisation — leave blank for an unsigned
-          # build (works for personal use, triggers Gatekeeper warning once).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # macOS code signing + notarisation are *intentionally* not passed
+          # here. Passing an empty `APPLE_CERTIFICATE` makes the bundler
+          # try to import an empty keychain item and fail. To enable
+          # signed Mac builds later, add the secrets + this env block:
+          #   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD /
+          #   APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD /
+          #   APPLE_TEAM_ID
+          # Without them the resulting .dmg is unsigned — works for
+          # personal use, triggers Gatekeeper warning on first open.
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Claude Agent Desktop ${{ github.ref_name }}"
