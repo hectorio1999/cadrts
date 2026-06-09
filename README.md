@@ -277,7 +277,7 @@ For the Hermes-style "agent in an LXC, every device connects to it" setup
 see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Quick version:
 
 1. Create a Debian 12 LXC on Proxmox (2 GB RAM, 8 GB disk).
-2. SCP this repo to `/opt/cad` on the LXC.
+2. On the LXC, `git clone https://github.com/hectorio1999/cadrts /opt/cad`.
 3. SSH in as root, run `bash /opt/cad/scripts/lxc-bootstrap.sh`. It prints
    the URL + bearer token.
 4. In the desktop app: **⚙ settings (transport)** → Remote → paste the URL
@@ -285,6 +285,46 @@ see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Quick version:
 5. Add a Cloudflare tunnel ingress so you can use it from anywhere:
    `agent.rosariotechsolutions.com → http://<lxc-ip>:9120` with
    `httpHostHeader: localhost` (matches Hermes's working setup).
+
+To deploy a new version after pushing to `main`:
+
+```bash
+ssh root@<lxc-ip> bash /opt/cad/scripts/deploy-lxc.sh
+```
+
+That pulls origin/main, rebuilds the web bundle + server binary, updates
+`CAD_BUILD_COMMIT` in the env file, and restarts the systemd unit. The
+UpdateBadge in the running clients goes dark within ~60 s.
+
+## Three ways to run the client
+
+- **Browser** — open the server's URL (`https://agent.rosariotechsolutions.com`
+  in Hector's deploy), paste the bearer token, you're in. No install. Works
+  on Mac, phones, anywhere.
+- **Tauri desktop binary** — built per-platform via
+  [`.github/workflows/desktop-release.yml`](.github/workflows/desktop-release.yml).
+  Push a `v*` tag → GH Actions builds signed `.dmg` / `.msi` / `.AppImage`
+  artefacts and publishes a GitHub Release. The bundled
+  `tauri-plugin-updater` auto-checks that release feed.
+- **Local build on a Mac** — `npm install && npm run build` on macOS
+  produces `src-tauri/target/release/bundle/dmg/Claude Agent Desktop_*.dmg`.
+  See [`docs/MAC-BUILD.md`](docs/MAC-BUILD.md).
+
+## Auto-update
+
+The UpdateBadge at the bottom-right is wired to two feeds:
+
+- **`/api/version`** (server-side): compares the server's baked
+  `CAD_BUILD_COMMIT` against `origin/main` HEAD in `/opt/cad`. When they
+  differ, the badge lights up. Click for the changelog. "Update now" reloads
+  the browser shell (which immediately picks up the latest web bundle the
+  server has on disk).
+- **Tauri updater plugin** (desktop only): on "Update now" in the desktop
+  app, the plugin checks
+  `https://github.com/hectorio1999/cadrts/releases/latest/download/latest.json`,
+  downloads the matching signed bundle for the current OS/arch, and
+  relaunches. The signing keypair is at `~/.tauri/cad-updater.key` on
+  Hector's laptop — its public half is committed in `tauri.conf.json`.
 
 ## What's intentionally not here yet
 
