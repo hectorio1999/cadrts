@@ -2,6 +2,20 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.7.0] — 2026-06-10 — "Live Activity"
+
+### Added
+- **Live activity indicator.** While a turn streams, a status row shows what the
+  agent is doing *right now* — "🔍 Searching the web: …", "📖 Reading …",
+  "⚙️ Running …", or "Thinking" between steps — with animated dots and a ticking
+  elapsed timer. Long turns (e.g. Opus + research) now clearly look alive even
+  before any text arrives. Replaces the minimal "▍ thinking" line.
+
+### Fixed
+- **Settings modal scrolls.** With the added model/permission/tools controls the
+  panel could overflow with no scroll; it's now height-capped with a scrollable
+  body (header and action buttons stay pinned).
+
 ## [0.6.0] — 2026-06-10 — "Model Picker & Update UX"
 
 ### Added

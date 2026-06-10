@@ -8,6 +8,7 @@ import type { PermissionMode } from "../lib/types";
 import MessageItem from "./MessageItem";
 import WorkspaceBar from "./WorkspaceBar";
 import SkillLibrary from "./SkillLibrary";
+import LiveActivity from "./LiveActivity";
 
 export default function ChatPane() {
   const messages = useStore((s) => s.messages);
@@ -122,11 +123,7 @@ export default function ChatPane() {
         ) : (
           messages.map((m) => <MessageItem key={m.id} message={m} />)
         )}
-        {streaming && (
-          <div className="text-xs text-zinc-500 font-mono pulse-dot pl-1">
-            ▍ thinking
-          </div>
-        )}
+        {streaming && <LiveActivity messages={messages} />}
       </div>
 
       {!atBottom && messages.length > 0 && (

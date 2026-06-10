@@ -75,7 +75,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="w-[620px] max-w-[92vw] bg-ink-800 border border-ink-500 rounded-lg flex flex-col"
+        className="flex max-h-[88vh] w-[620px] max-w-[92vw] flex-col rounded-lg border border-ink-500 bg-ink-800"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-ink-600 flex items-center justify-between">
@@ -93,7 +93,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           <Choice
             current={mode}
             value="local"
