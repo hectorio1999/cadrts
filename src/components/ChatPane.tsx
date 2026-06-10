@@ -7,7 +7,7 @@ import { asDirective, type WorkflowSkill } from "../lib/skillLibrary";
 import type { PermissionMode } from "../lib/types";
 import MessageItem from "./MessageItem";
 import WorkspaceBar from "./WorkspaceBar";
-import SkillPicker from "./SkillPicker";
+import SkillLibrary from "./SkillLibrary";
 
 export default function ChatPane() {
   const messages = useStore((s) => s.messages);
@@ -26,10 +26,9 @@ export default function ChatPane() {
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [pendingSkill, setPendingSkill] = useState<WorkflowSkill | null>(null);
-  const [skillPickerOpen, setSkillPickerOpen] = useState(false);
+  const [skillLibraryOpen, setSkillLibraryOpen] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const skillWrapRef = useRef<HTMLSpanElement | null>(null);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -164,25 +163,13 @@ export default function ChatPane() {
             value={prefs.permissionMode}
             onChange={(m) => setPrefs({ permissionMode: m })}
           />
-          <span ref={skillWrapRef} className="relative">
-            <button
-              onClick={() => setSkillPickerOpen((o) => !o)}
-              className="rounded border border-ink-500 px-1.5 py-0.5 text-zinc-300 hover:bg-ink-600/40"
-              title="Attach a workflow skill to your next message"
-            >
-              ⚡ skill
-            </button>
-            {skillPickerOpen && (
-              <SkillPicker
-                wrapRef={skillWrapRef}
-                onPick={(s) => {
-                  setPendingSkill(s);
-                  setSkillPickerOpen(false);
-                }}
-                onClose={() => setSkillPickerOpen(false)}
-              />
-            )}
-          </span>
+          <button
+            onClick={() => setSkillLibraryOpen(true)}
+            className="rounded border border-ink-500 px-1.5 py-0.5 text-zinc-300 hover:bg-ink-600/40"
+            title="Browse the skill library"
+          >
+            ⚡ skill
+          </button>
           {pendingSkill && (
             <span className="inline-flex items-center gap-1 rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 text-accent">
               {pendingSkill.name}
@@ -238,6 +225,18 @@ export default function ChatPane() {
           )}
         </div>
       </div>
+
+      {skillLibraryOpen && (
+        <SkillLibrary
+          onUse={(skill, prompt) => {
+            setPendingSkill(skill);
+            if (prompt) setInput(prompt);
+            setSkillLibraryOpen(false);
+            taRef.current?.focus();
+          }}
+          onClose={() => setSkillLibraryOpen(false)}
+        />
+      )}
     </main>
   );
 }

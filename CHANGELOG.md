@@ -2,6 +2,34 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.4.0] — 2026-06-10 — "General-Purpose Skill Library"
+
+Turns the skill system from a handful of dev workflows into a broad
+general-purpose library — the app now feels like it has many expert assistants
+built in, not just an IT toolkit.
+
+### Added
+- **57 expert skills across 11 categories**: Coding, Writing, Research,
+  Business, Productivity, Data, Documents, Design, Learning, Creative, and
+  IT/Homelab. IT is now one category among many, not the whole library.
+- **Rich skill schema** (16 fields): id, name, category, description, purpose,
+  whenToUse, inputs, outputs, steps, behaviorGuidelines, toolsAllowed/Disallowed,
+  safetyLevel, confirmationRequired, examplePrompts, successCriteria,
+  failureModes, followUpBehavior. The structured fields are composed into the
+  agent's directive — they drive behavior, not just metadata.
+- **Skill Library UI** — browse by category, search, open any skill for full
+  detail + example prompts, and "Use this skill" (or click an example prompt to
+  prefill and attach it). Replaces the small inline picker.
+- **Per-category files** (`src/lib/skills/*.ts`) so the library is easy to extend.
+- **Validation + graceful failure** — malformed/duplicate skills are dropped at
+  load, recorded, and surfaced as a banner; they never crash or vanish silently.
+- Docs: `docs/SKILLS.md` and `docs/SKILL_AUTHORING.md` (schema, quality bar,
+  strong-vs-weak examples, how to add skills).
+
+### Changed
+- Skill safety: read-only skills now instruct the agent not to edit/run; each
+  skill declares its tools and safety level.
+
 ## [0.3.1] — 2026-06-10
 
 ### Changed
