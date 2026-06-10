@@ -47,7 +47,8 @@ export const PERMISSION_MODES: {
 /** Model choices. Empty string = the plan's default model. Aliases map to the
  *  latest of each family; a full model id can also be set via the custom field. */
 export const MODELS: { value: string; label: string; hint: string }[] = [
-  { value: "", label: "Default", hint: "Whatever your plan uses by default." },
+  { value: "", label: "Default", hint: "Whatever your plan uses by default (currently Fable 5)." },
+  { value: "claude-fable-5", label: "Fable 5", hint: "The default frontier model." },
   { value: "opus", label: "Opus", hint: "Most capable — best for hard reasoning and code." },
   { value: "sonnet", label: "Sonnet", hint: "Balanced speed and capability." },
   { value: "haiku", label: "Haiku", hint: "Fastest and cheapest — quick tasks." },
