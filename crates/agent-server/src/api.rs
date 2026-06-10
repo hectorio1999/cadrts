@@ -5,6 +5,7 @@
 
 use agent_core::agent::{AgentTransport, PermissionMode, TurnOutcome, TurnRequest};
 use agent_core::auth::AuthStatus;
+use agent_core::cron::{self, Job, RunRecord};
 use agent_core::db::{self, MessageRow, SessionRow};
 use agent_core::memory::{self, Skill};
 use agent_core::paths;
@@ -419,6 +420,123 @@ fn validate_skill_name(name: &str) -> Result<(), (StatusCode, String)> {
 
 fn internal<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+}
+
+// -------------------- scheduled jobs --------------------
+
+/// A job plus everything the manager UI needs to render it.
+#[derive(Serialize)]
+pub struct JobView {
+    #[serde(flatten)]
+    pub job: Job,
+    /// Next fire time (epoch millis), if the schedule is valid.
+    pub next_run: Option<i64>,
+    /// Plain-English schedule for display.
+    pub schedule_human: String,
+    /// Most recent run, if any.
+    pub last_run: Option<RunRecord>,
+}
+
+pub async fn list_jobs(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+) -> Result<Json<Vec<JobView>>, (StatusCode, String)> {
+    let jobs = cron::load_jobs().map_err(internal)?;
+    let views = jobs
+        .into_iter()
+        .map(|j| JobView {
+            next_run: cron::next_run(&j),
+            schedule_human: cron::human_schedule(&j),
+            last_run: cron::last_run(&j.id).ok().flatten(),
+            job: j,
+        })
+        .collect();
+    Ok(Json(views))
+}
+
+/// Create or replace a job (the UI's "new/edit" form posts a full Job).
+pub async fn create_job(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Json(mut job): Json<Job>,
+) -> Result<Json<Job>, (StatusCode, String)> {
+    if job.id.trim().is_empty() {
+        job.id = cron::sanitize_id(&job.name.to_lowercase().replace(' ', "-"));
+    } else {
+        job.id = cron::sanitize_id(&job.id);
+    }
+    if job.id.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "job needs a name or id".into()));
+    }
+    cron::save_job(&mut job).map_err(internal)?;
+    Ok(Json(job))
+}
+
+/// Partial update — merges the posted fields onto the existing job. Used for
+/// pause/resume (`{"enabled":false}`), reschedule, rename, etc.
+pub async fn update_job(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Path(id): Path<String>,
+    Json(patch): Json<serde_json::Value>,
+) -> Result<Json<Job>, (StatusCode, String)> {
+    let job = cron::load_job(&id)
+        .map_err(internal)?
+        .ok_or((StatusCode::NOT_FOUND, "no such job".into()))?;
+    let mut v = serde_json::to_value(&job).map_err(internal)?;
+    if let (Some(obj), Some(p)) = (v.as_object_mut(), patch.as_object()) {
+        for (k, val) in p {
+            if k != "id" {
+                obj.insert(k.clone(), val.clone());
+            }
+        }
+    }
+    let mut merged: Job = serde_json::from_value(v).map_err(internal)?;
+    cron::save_job(&mut merged).map_err(internal)?;
+    Ok(Json(merged))
+}
+
+pub async fn delete_job(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    cron::delete_job(&id).map_err(internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Run a job immediately (out of schedule). Fire-and-forget — the run is
+/// appended to history when it finishes; the UI refreshes the run list.
+pub async fn run_job_now(
+    _auth: Authed,
+    State(state): State<Arc<ServerState>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let job = cron::load_job(&id)
+        .map_err(internal)?
+        .ok_or((StatusCode::NOT_FOUND, "no such job".into()))?;
+    tokio::spawn(async move {
+        if let Err(e) = crate::scheduler::run_job(&state, &job, "manual").await {
+            tracing::warn!(error = ?e, "manual job run failed");
+        }
+    });
+    Ok(StatusCode::ACCEPTED)
+}
+
+#[derive(Deserialize)]
+pub struct RunsQuery {
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+pub async fn job_runs(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Path(id): Path<String>,
+    Query(q): Query<RunsQuery>,
+) -> Result<Json<Vec<RunRecord>>, (StatusCode, String)> {
+    let runs = cron::load_runs(&id, q.limit.unwrap_or(50)).map_err(internal)?;
+    Ok(Json(runs))
 }
 
 // Silence the unused warning while we don't expose auth_status remotely yet.

@@ -15,6 +15,7 @@
 pub mod agent;
 pub mod auth;
 pub mod config;
+pub mod cron;
 pub mod db;
 pub mod memory;
 pub mod paths;

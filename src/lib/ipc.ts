@@ -9,6 +9,9 @@ import type {
   AgentEventEnvelope,
   AuthStatus,
   ClientConfig,
+  CronJob,
+  CronRun,
+  JobView,
   MessageRow,
   PersistMessage,
   RemoteHealth,
@@ -192,6 +195,35 @@ function pathToSkillName(path: string): string {
   // just the skill stem. Strip dir + .md.
   const tail = path.split(/[\\/]/).pop() ?? path;
   return tail.replace(/\.md$/i, "");
+}
+
+// ---------- scheduled jobs ----------
+// Jobs live on the agent-server (the scheduler runs there), so these always
+// hit the HTTP API. They're available in Remote mode; in Local mode there's no
+// server scheduler and the calls will fail (the manager shows a friendly note).
+
+export async function listJobs(): Promise<JobView[]> {
+  return webApi<JobView[]>("GET", "/api/jobs");
+}
+
+export async function createJob(job: CronJob): Promise<CronJob> {
+  return webApi<CronJob>("POST", "/api/jobs", job);
+}
+
+export async function updateJob(id: string, patch: Partial<CronJob>): Promise<CronJob> {
+  return webApi<CronJob>("PATCH", `/api/jobs/${encodeURIComponent(id)}`, patch);
+}
+
+export async function deleteJob(id: string): Promise<void> {
+  await webApi<unknown>("DELETE", `/api/jobs/${encodeURIComponent(id)}`);
+}
+
+export async function runJobNow(id: string): Promise<void> {
+  await webApi<unknown>("POST", `/api/jobs/${encodeURIComponent(id)}/run`);
+}
+
+export async function jobRuns(id: string, limit = 50): Promise<CronRun[]> {
+  return webApi<CronRun[]>("GET", `/api/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`);
 }
 
 export async function cancelTurn(turnId: string): Promise<boolean> {

@@ -23,6 +23,7 @@
 
 mod api;
 mod auth;
+mod scheduler;
 mod state;
 mod stream;
 mod version;
@@ -61,6 +62,9 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(ServerState::boot(token).await?);
 
+    // Background scheduler: runs due jobs from ~/.cad/jobs/ each minute.
+    scheduler::spawn(state.clone());
+
     let api = Router::new()
         .route("/health", get(api::health))
         .route("/version", get(api::version))
@@ -75,7 +79,11 @@ async fn main() -> Result<()> {
         .route("/search", get(api::search_messages))
         .route("/memory", get(api::read_memory).put(api::write_memory))
         .route("/skills", get(api::list_skills))
-        .route("/skills/:name", get(api::read_skill).put(api::write_skill));
+        .route("/skills/:name", get(api::read_skill).put(api::write_skill))
+        .route("/jobs", get(api::list_jobs).post(api::create_job))
+        .route("/jobs/:id", patch(api::update_job).delete(api::delete_job))
+        .route("/jobs/:id/run", post(api::run_job_now))
+        .route("/jobs/:id/runs", get(api::job_runs));
 
     let ws = Router::new().route("/stream/:turn_id", get(stream::ws_stream));
 

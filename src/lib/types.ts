@@ -197,3 +197,41 @@ export type PersistedContent = {
   text: string;
   tools?: ToolRun[];
 };
+
+// ---------- scheduled jobs (cron) ----------
+
+export type CronJob = {
+  id: string;
+  name: string;
+  description: string;
+  schedule: string;
+  timezone: string;
+  prompt: string;
+  permission_mode?: string | null;
+  allowed_tools?: string[] | null;
+  model?: string | null;
+  cwd?: string | null;
+  notify: string; // always | on_change | on_failure
+  enabled: boolean;
+  created_at: number;
+  updated_at: number;
+};
+
+export type CronRun = {
+  started_at: number;
+  finished_at: number;
+  ok: boolean;
+  summary: string;
+  cost?: number | null;
+  error?: string | null;
+  output_hash?: string | null;
+  changed: boolean;
+  trigger: string; // schedule | manual
+};
+
+/// What GET /api/jobs returns: a job plus computed display fields.
+export type JobView = CronJob & {
+  next_run: number | null;
+  schedule_human: string;
+  last_run: CronRun | null;
+};

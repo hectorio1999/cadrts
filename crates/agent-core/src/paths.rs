@@ -50,6 +50,19 @@ pub fn logs_dir() -> Result<PathBuf> {
     Ok(app_home()?.join("logs"))
 }
 
+/// Scheduled-automation ("cron job") definitions live here as `<id>.json`
+/// files — created by the agent with its file tools and by the jobs API, read
+/// by the server-side scheduler. Run history lives in the `.runs/` subdir.
+pub fn jobs_dir() -> Result<PathBuf> {
+    Ok(app_home()?.join("jobs"))
+}
+
+/// Per-job run history, one append-only `<id>.jsonl` per job. Kept in a
+/// dot-subdir of `jobs/` so it's never mistaken for a job definition.
+pub fn job_runs_dir() -> Result<PathBuf> {
+    Ok(jobs_dir()?.join(".runs"))
+}
+
 /// Idempotently create the app dirs and seed empty defaults.
 /// Safe to call on every boot.
 pub fn ensure_layout() -> Result<()> {
@@ -57,6 +70,8 @@ pub fn ensure_layout() -> Result<()> {
     std::fs::create_dir_all(&home).with_context(|| format!("mkdir {}", home.display()))?;
     std::fs::create_dir_all(skills_dir()?)?;
     std::fs::create_dir_all(logs_dir()?)?;
+    std::fs::create_dir_all(jobs_dir()?)?;
+    std::fs::create_dir_all(job_runs_dir()?)?;
 
     // Refresh the base skill library every boot — these are app-owned and
     // versioned with the binary. User-created skills live under skills/ (not

@@ -3,6 +3,7 @@ import AuthGate from "./components/AuthGate";
 import ChatPane from "./components/ChatPane";
 import CommandPalette from "./components/CommandPalette";
 import InspectorPane from "./components/InspectorPane";
+import JobsManager from "./components/JobsManager";
 import MemoryEditor from "./components/MemoryEditor";
 import SessionSidebar from "./components/SessionSidebar";
 import SettingsModal from "./components/SettingsModal";
@@ -23,6 +24,7 @@ export default function App() {
   const refreshSessions = useStore((s) => s.refreshSessions);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [jobsOpen, setJobsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -109,6 +111,7 @@ export default function App() {
         <SessionSidebar
           onOpenMemory={() => setMemoryOpen(true)}
           onOpenSkills={() => setSkillsOpen(true)}
+          onOpenJobs={() => setJobsOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <ChatPane />
@@ -117,6 +120,7 @@ export default function App() {
       <StatusBar />
       {memoryOpen && <MemoryEditor onClose={() => setMemoryOpen(false)} />}
       {skillsOpen && <SkillsManager onClose={() => setSkillsOpen(false)} />}
+      {jobsOpen && <JobsManager onClose={() => setJobsOpen(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       <CommandPalette
         open={paletteOpen}

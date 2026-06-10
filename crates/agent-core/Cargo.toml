@@ -33,6 +33,8 @@ async-trait = { workspace = true }
 gray_matter = { workspace = true }
 walkdir = { workspace = true }
 include_dir = "0.7"
+cron = "0.12"
+chrono-tz = "0.9"
 rusqlite = { workspace = true }
 reqwest = { workspace = true }
 tokio-tungstenite = { workspace = true }

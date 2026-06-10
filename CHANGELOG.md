@@ -2,6 +2,40 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.8.0] — 2026-06-10 — "Scheduled Automations"
+
+Atlas can now create and run real recurring automations — and proactively
+suggests them when a task is worth repeating, monitoring, or summarizing.
+
+### Added
+- **Scheduled jobs engine (server-side).** A scheduler in `agent-server` runs due
+  jobs every minute as headless Atlas turns (with the server's own credentials),
+  so automations fire even when no client is connected. Jobs are JSON files in
+  `~/.cad/jobs/` — Atlas creates/edits them with its file tools, the same pattern
+  as self-improving skills. Run history (status, output, cost, failures) is kept
+  per job. New `cron`/`chrono-tz`-backed schedule evaluation in `agent-core::cron`
+  (5-field cron + IANA timezones, plain-English labels), unit-tested.
+- **Proactive suggestion intelligence.** Atlas's system prompt now teaches it to
+  recognize when a result would be more valuable on a schedule (reports, scans,
+  digests, monitors, price/uptime checks, opportunity scans, health checks…),
+  score it, and *offer* to automate it — while explicitly NOT pitching a job
+  after every message. Always confirms before creating, states the schedule in
+  plain English + timezone, respects permission boundaries (sending email /
+  changing servers / deleting needs approval), and defaults monitors to
+  notify-on-change/failure to stay quiet unless something's wrong.
+- **Jobs API** — `GET/POST /api/jobs`, `PATCH/DELETE /api/jobs/:id`,
+  `POST /api/jobs/:id/run` (run now), `GET /api/jobs/:id/runs` (history).
+- **Scheduled Jobs manager UI** (sidebar → "⏰ scheduled jobs"): each job's
+  plain-English schedule, next/last run, status, and run logs, with
+  pause/resume, run-now, and delete. (Remote mode — that's where the scheduler
+  lives.)
+
+## [0.7.1] — 2026-06-10 — "Fable 5 in the picker"
+
+### Added
+- **Fable 5** as an explicit model choice (Default · Fable 5 · Opus · Sonnet ·
+  Haiku), wired to `--model claude-fable-5`.
+
 ## [0.7.0] — 2026-06-10 — "Live Activity"
 
 ### Added

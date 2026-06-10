@@ -11,10 +11,12 @@ import { useStore } from "../lib/store";
 export default function SessionSidebar({
   onOpenMemory,
   onOpenSkills,
+  onOpenJobs,
   onOpenSettings,
 }: {
   onOpenMemory: () => void;
   onOpenSkills: () => void;
+  onOpenJobs: () => void;
   onOpenSettings: () => void;
 }) {
   const session = useStore((s) => s.session);
@@ -87,6 +89,12 @@ export default function SessionSidebar({
           className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
         >
           ⌥  manage skills
+        </button>
+        <button
+          onClick={onOpenJobs}
+          className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
+        >
+          ⏰  scheduled jobs
         </button>
         <button
           onClick={onOpenSettings}
