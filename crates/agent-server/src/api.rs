@@ -202,17 +202,25 @@ pub async fn start_turn(
             let _ = tx.send(TurnPump::Event(ev));
         }
         // Transport's join handle delivers the outcome OR an error.
-        match handle.join.await {
+        let terminal = match handle.join.await {
             Ok(Ok(outcome)) => {
                 let json = serde_json::to_string(&outcome).unwrap_or_else(|_| "{}".into());
-                let _ = tx.send(TurnPump::Outcome(json));
+                TurnPump::Outcome(json)
             }
-            Ok(Err(e)) => {
-                let _ = tx.send(TurnPump::Error(e.to_string()));
-            }
-            Err(e) => {
-                let _ = tx.send(TurnPump::Error(format!("task crashed: {e}")));
-            }
+            Ok(Err(e)) => TurnPump::Error(e.to_string()),
+            Err(e) => TurnPump::Error(format!("task crashed: {e}")),
+        };
+        let _ = tx.send(terminal.clone());
+        // Retain the terminal frame briefly so a client whose WS dropped during
+        // the turn can reconnect and still get the result. Prune entries >2 min.
+        {
+            let now = std::time::Instant::now();
+            let mut c = state_pump.completed.lock().await;
+            c.retain(|_, v| now.duration_since(v.at) < std::time::Duration::from_secs(120));
+            c.insert(
+                turn_id_pump.clone(),
+                crate::state::CompletedTurn { terminal, at: now },
+            );
         }
         // Remove the registration; broadcast tx dropping closes subscribers.
         state_pump.running.lock().await.remove(&turn_id_pump);

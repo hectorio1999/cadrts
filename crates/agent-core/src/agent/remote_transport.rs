@@ -200,69 +200,111 @@ impl AgentTransport for RemoteTransport {
         let cfg = self.cfg.clone();
         let http = self.http.clone();
         let turn_id_drive = resp.turn_id.clone();
+        // Kept for reconnects: the server retains a finished turn's outcome for
+        // ~2 min, and keeps a running turn subscribable, so re-opening the WS to
+        // the same turn recovers from a transient drop instead of going silent.
+        let ws_url_re = ws_url.clone();
+        let bearer_re = bearer.clone();
 
         let join = tokio::spawn(async move {
             let mut final_outcome: Option<TurnOutcome> = None;
             let mut last_text: Option<String> = None;
+            let mut reconnects: u32 = 0;
+            const MAX_RECONNECTS: u32 = 12;
 
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = &mut cancel_rx => {
-                        info!(turn_id = %turn_id_drive, "remote cancel requested — DELETE /api/turns/:id");
-                        let base = cfg.base_url.trim_end_matches('/');
-                        let _ = http
-                            .delete(format!("{base}/api/turns/{turn_id_drive}"))
-                            .send()
-                            .await;
-                        let _ = ws_tx.send(Message::Close(None)).await;
-                        return Ok(TurnOutcome {
-                            session_id: final_outcome.as_ref().map(|o| o.session_id.clone()).unwrap_or_default(),
-                            is_error: true,
-                            terminal_reason: Some("cancelled".into()),
-                            total_cost_usd: None,
-                            final_text: last_text,
-                            num_turns: None,
-                        });
-                    }
-                    msg = ws_rx.next() => match msg {
-                        Some(Ok(Message::Text(t))) => {
-                            match serde_json::from_str::<WireEnvelope>(&t) {
-                                Ok(WireEnvelope::Event { event, .. }) => {
-                                    // Track last assistant text so we have something useful on cancel.
-                                    if let AgentEvent::Assistant(a) = &event {
-                                        if let Some(m) = &a.message {
-                                            if let Some(content) = &m.content {
-                                                for b in content {
-                                                    if let super::events::ContentBlock::Text { text } = b {
-                                                        last_text = Some(text.clone());
+            'session: loop {
+                let mut got_outcome_this_conn = false;
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = &mut cancel_rx => {
+                            info!(turn_id = %turn_id_drive, "remote cancel requested — DELETE /api/turns/:id");
+                            let base = cfg.base_url.trim_end_matches('/');
+                            let _ = http
+                                .delete(format!("{base}/api/turns/{turn_id_drive}"))
+                                .send()
+                                .await;
+                            let _ = ws_tx.send(Message::Close(None)).await;
+                            return Ok(TurnOutcome {
+                                session_id: final_outcome.as_ref().map(|o| o.session_id.clone()).unwrap_or_default(),
+                                is_error: true,
+                                terminal_reason: Some("cancelled".into()),
+                                total_cost_usd: None,
+                                final_text: last_text,
+                                num_turns: None,
+                            });
+                        }
+                        msg = ws_rx.next() => match msg {
+                            Some(Ok(Message::Text(t))) => {
+                                match serde_json::from_str::<WireEnvelope>(&t) {
+                                    Ok(WireEnvelope::Event { event, .. }) => {
+                                        if let AgentEvent::Assistant(a) = &event {
+                                            if let Some(m) = &a.message {
+                                                if let Some(content) = &m.content {
+                                                    for b in content {
+                                                        if let super::events::ContentBlock::Text { text } = b {
+                                                            last_text = Some(text.clone());
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
+                                        let _ = event_tx_drive.send(event);
                                     }
-                                    let _ = event_tx_drive.send(event);
+                                    Ok(WireEnvelope::Error { message, .. }) => {
+                                        warn!(message, "server-side turn error");
+                                        return Err(anyhow!("server: {message}"));
+                                    }
+                                    Ok(WireEnvelope::Outcome { outcome, .. }) => {
+                                        final_outcome = Some(outcome);
+                                        got_outcome_this_conn = true;
+                                    }
+                                    Err(e) => warn!(error = %e, "could not decode WS frame"),
                                 }
-                                Ok(WireEnvelope::Error { message, .. }) => {
-                                    warn!(message, "server-side turn error");
-                                    return Err(anyhow!("server: {message}"));
-                                }
-                                Ok(WireEnvelope::Outcome { outcome, .. }) => {
-                                    final_outcome = Some(outcome);
-                                    // We expect the server to close after this.
-                                }
-                                Err(e) => warn!(error = %e, "could not decode WS frame"),
+                            }
+                            Some(Ok(Message::Ping(p))) => {
+                                let _ = ws_tx.send(Message::Pong(p)).await;
+                            }
+                            Some(Ok(Message::Close(_))) | None => break,
+                            Some(Ok(_)) => {}
+                            Some(Err(e)) => {
+                                warn!(error = %e, "WS read error");
+                                break;
                             }
                         }
-                        Some(Ok(Message::Ping(p))) => {
-                            let _ = ws_tx.send(Message::Pong(p)).await;
-                        }
-                        Some(Ok(Message::Close(_))) | None => break,
-                        Some(Ok(_)) => {}
-                        Some(Err(e)) => {
-                            warn!(error = %e, "WS read error");
-                            break;
-                        }
+                    }
+                }
+
+                // Connection ended. If we already have the outcome, we're done.
+                if final_outcome.is_some() || got_outcome_this_conn {
+                    break 'session;
+                }
+                // Unexpected drop before the outcome — reconnect to the same turn.
+                if reconnects >= MAX_RECONNECTS {
+                    warn!(turn_id = %turn_id_drive, "gave up reconnecting to turn");
+                    break 'session;
+                }
+                reconnects += 1;
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+                let reconnect = async {
+                    let mut rb = tokio_tungstenite::tungstenite::client::IntoClientRequest::into_client_request(
+                        ws_url_re.as_str(),
+                    )?;
+                    rb.headers_mut().insert("Authorization", bearer_re.parse()?);
+                    let (ws, _r) = tokio_tungstenite::connect_async(rb).await?;
+                    anyhow::Ok(ws.split())
+                }
+                .await;
+                match reconnect {
+                    Ok((tx, rx)) => {
+                        ws_tx = tx;
+                        ws_rx = rx;
+                        info!(turn_id = %turn_id_drive, reconnects, "WS reconnected to in-flight turn");
+                    }
+                    Err(e) => {
+                        // Couldn't reconnect this round; the next loop iteration
+                        // will hit the dead socket, break, and retry (bounded).
+                        warn!(error = %e, "WS reconnect attempt failed");
                     }
                 }
             }

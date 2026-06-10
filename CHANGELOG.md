@@ -2,6 +2,21 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.8.2] — 2026-06-10
+
+### Fixed
+- **Turns going silent mid-stream (esp. long Opus + research turns).** If the
+  WebSocket between the desktop client and the server dropped for a moment
+  (WiFi blip, brief sleep, transient hiccup) during a long turn, the client gave
+  up — ending the turn as "stream closed before outcome" — even though the turn
+  was still running fine on the server. That left you staring at a stalled
+  response and re-prompting to "bring it back" (which sometimes also failed with
+  "No conversation found"). Now: the client **reconnects** to the same in-flight
+  turn (up to ~20s of retries) instead of giving up, and the server **retains a
+  finished turn's outcome for ~2 minutes** so a client that reconnects right
+  after completion still receives the final result. Long research turns survive
+  transient drops and complete on their own.
+
 ## [0.8.1] — 2026-06-10
 
 ### Fixed

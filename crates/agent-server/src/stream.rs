@@ -66,9 +66,23 @@ async fn run(mut socket: WebSocket, state: Arc<ServerState>, turn_id: String) {
     };
 
     let Some(mut rx) = rx else {
-        let env = WireEnvelope::Error {
-            turn_id: turn_id.clone(),
-            message: "turn not found (already finished or never started)".into(),
+        // Not currently running. It may have just FINISHED while this client's
+        // WS was reconnecting — replay the retained terminal frame so the turn
+        // completes cleanly instead of looking like it vanished.
+        let retained = {
+            let c = state.completed.lock().await;
+            c.get(&turn_id).map(|ct| ct.terminal.clone())
+        };
+        let env = match retained {
+            Some(TurnPump::Outcome(json_str)) => WireEnvelope::Outcome {
+                turn_id: turn_id.clone(),
+                outcome: serde_json::from_str(&json_str).unwrap_or_else(|_| json!({})),
+            },
+            Some(TurnPump::Error(msg)) => WireEnvelope::Error { turn_id: turn_id.clone(), message: msg },
+            _ => WireEnvelope::Error {
+                turn_id: turn_id.clone(),
+                message: "turn not found (already finished or never started)".into(),
+            },
         };
         if let Ok(j) = serde_json::to_string(&env) {
             let _ = socket.send(Message::Text(j)).await;

@@ -35,11 +35,22 @@ pub enum TurnPump {
     Error(String),
 }
 
+/// A turn that finished recently. Retained briefly so a client whose WS dropped
+/// during the turn can reconnect and still receive the final outcome/error
+/// instead of seeing "turn not found".
+pub struct CompletedTurn {
+    /// The terminal frame — `TurnPump::Outcome(..)` or `TurnPump::Error(..)`.
+    pub terminal: TurnPump,
+    pub at: std::time::Instant,
+}
+
 pub struct ServerState {
     pub bearer_token: String,
     pub transport: Arc<CliTransport>,
     pub db: Mutex<Connection>,
     pub running: Mutex<HashMap<String, ActiveTurn>>,
+    /// turn_id → its terminal frame, kept ~2 min for reconnecting clients.
+    pub completed: Mutex<HashMap<String, CompletedTurn>>,
 }
 
 impl ServerState {
@@ -60,6 +71,7 @@ impl ServerState {
             transport,
             db: Mutex::new(conn),
             running: Mutex::new(HashMap::new()),
+            completed: Mutex::new(HashMap::new()),
         })
     }
 }
