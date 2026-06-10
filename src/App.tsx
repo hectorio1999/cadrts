@@ -12,7 +12,7 @@ import StatusBar from "./components/StatusBar";
 import ToastHost from "./components/ToastHost";
 import UpdateBadge from "./components/UpdateBadge";
 import WebLogin from "./components/WebLogin";
-import { authStatus, getConfig, testRemoteConnection } from "./lib/ipc";
+import { authStatus, getConfig, migrateLocalHistoryToServer, testRemoteConnection } from "./lib/ipc";
 import { isTauri } from "./lib/runtime";
 import { useStore } from "./lib/store";
 import type { AuthStatus } from "./lib/types";
@@ -93,6 +93,26 @@ export default function App() {
   // Pull session list once the auth gate clears.
   useEffect(() => {
     if (auth?.authenticated) void refreshSessions();
+  }, [auth?.authenticated, refreshSessions]);
+
+  // One-time: in the desktop app + Remote mode, push the local chat history up
+  // to the server so it's unified with the web UI. Runs once (flag), and only
+  // after a real remote attempt so a Local-mode launch doesn't burn the flag.
+  useEffect(() => {
+    if (!auth?.authenticated || !isTauri()) return;
+    const KEY = "cad-history-migrated-v1";
+    if (localStorage.getItem(KEY)) return;
+    (async () => {
+      try {
+        const cfg = await getConfig();
+        if (cfg.transport.mode !== "remote") return;
+        const { migrated } = await migrateLocalHistoryToServer();
+        localStorage.setItem(KEY, "1");
+        if (migrated > 0) await refreshSessions();
+      } catch {
+        // leave the flag unset so it retries on the next launch
+      }
+    })();
   }, [auth?.authenticated, refreshSessions]);
 
   if (auth === null) {

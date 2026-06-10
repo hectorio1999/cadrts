@@ -197,15 +197,24 @@ function pathToSkillName(path: string): string {
   return tail.replace(/\.md$/i, "");
 }
 
-// ---------- scheduled jobs ----------
-// Jobs live on the agent-server (the scheduler runs there), so these talk to it
-// over HTTP. Unlike most calls, we don't use Tauri commands here — we fetch the
-// server directly using the configured remote base_url (CORS is open + CSP is
-// null, so the desktop webview can reach the LXC). In Local mode there's no
-// server scheduler and `base` resolves to the app origin, so the call fails and
-// the manager shows a friendly "needs Remote mode" note.
+// ---------- server HTTP (jobs + remote-mode session/state) ----------
+// Talks to the agent-server directly over HTTP using the configured remote
+// base_url (CORS is open + CSP is null, so the desktop webview can reach the
+// LXC). Used for jobs (server-only) and for session ops in Remote mode.
 
-async function jobsApi<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Should this call hit the LOCAL Tauri DB? Only when we're the desktop app AND
+ *  the transport is Local. In Remote mode (and always in the browser) we route
+ *  to the configured server so history/state is unified across clients. */
+async function useLocalDb(): Promise<boolean> {
+  if (!isTauri()) return false;
+  try {
+    return (await getConfig()).transport.mode === "local";
+  } catch {
+    return true; // be conservative — fall back to the local DB
+  }
+}
+
+async function serverApi<T>(method: string, path: string, body?: unknown): Promise<T> {
   const cfg = await getConfig();
   const t = cfg.transport;
   const base = t.mode === "remote" ? t.base_url.replace(/\/$/, "") : apiOrigin();
@@ -227,7 +236,7 @@ async function jobsApi<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export async function listJobs(): Promise<JobView[]> {
-  const r = await jobsApi<JobView[]>("GET", "/api/jobs");
+  const r = await serverApi<JobView[]>("GET", "/api/jobs");
   // Defensive: a misrouted request (e.g. Local mode hitting the SPA) could
   // return HTML; never let a non-array reach the UI's .map.
   if (!Array.isArray(r)) throw new Error("server did not return a job list (are you in Remote mode?)");
@@ -235,23 +244,23 @@ export async function listJobs(): Promise<JobView[]> {
 }
 
 export async function createJob(job: CronJob): Promise<CronJob> {
-  return jobsApi<CronJob>("POST", "/api/jobs", job);
+  return serverApi<CronJob>("POST", "/api/jobs", job);
 }
 
 export async function updateJob(id: string, patch: Partial<CronJob>): Promise<CronJob> {
-  return jobsApi<CronJob>("PATCH", `/api/jobs/${encodeURIComponent(id)}`, patch);
+  return serverApi<CronJob>("PATCH", `/api/jobs/${encodeURIComponent(id)}`, patch);
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  await jobsApi<unknown>("DELETE", `/api/jobs/${encodeURIComponent(id)}`);
+  await serverApi<unknown>("DELETE", `/api/jobs/${encodeURIComponent(id)}`);
 }
 
 export async function runJobNow(id: string): Promise<void> {
-  await jobsApi<unknown>("POST", `/api/jobs/${encodeURIComponent(id)}/run`);
+  await serverApi<unknown>("POST", `/api/jobs/${encodeURIComponent(id)}/run`);
 }
 
 export async function jobRuns(id: string, limit = 50): Promise<CronRun[]> {
-  const r = await jobsApi<CronRun[]>("GET", `/api/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`);
+  const r = await serverApi<CronRun[]>("GET", `/api/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`);
   return Array.isArray(r) ? r : [];
 }
 
@@ -361,12 +370,12 @@ export async function persistSession(args: {
   total_cost_delta: number;
   messages: PersistMessage[];
 }): Promise<void> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     await t.invoke<void>("persist_session", { args });
     return;
   }
-  await webApi<unknown>(
+  await serverApi<unknown>(
     "POST",
     `/api/sessions/${encodeURIComponent(args.session_id)}/persist`,
     args,
@@ -374,52 +383,46 @@ export async function persistSession(args: {
 }
 
 export async function listSessions(limit?: number): Promise<SessionRow[]> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     return t.invoke<SessionRow[]>("list_sessions", { limit: limit ?? null });
   }
   const q = limit != null ? `?limit=${limit}` : "";
-  return webApi<SessionRow[]>("GET", `/api/sessions${q}`);
+  const r = await serverApi<SessionRow[]>("GET", `/api/sessions${q}`);
+  return Array.isArray(r) ? r : [];
 }
 
 export async function loadMessages(sessionId: string): Promise<MessageRow[]> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     return t.invoke<MessageRow[]>("load_messages", { sessionId });
   }
-  return webApi<MessageRow[]>(
+  return serverApi<MessageRow[]>(
     "GET",
     `/api/sessions/${encodeURIComponent(sessionId)}/messages`,
   );
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     await t.invoke<void>("delete_session", { sessionId });
     return;
   }
-  await webApi<unknown>(
-    "DELETE",
-    `/api/sessions/${encodeURIComponent(sessionId)}`,
-  );
+  await serverApi<unknown>("DELETE", `/api/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 export async function renameSession(sessionId: string, title: string): Promise<void> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     await t.invoke<void>("rename_session", { sessionId, title });
     return;
   }
-  await webApi<unknown>(
-    "PATCH",
-    `/api/sessions/${encodeURIComponent(sessionId)}`,
-    { title },
-  );
+  await serverApi<unknown>("PATCH", `/api/sessions/${encodeURIComponent(sessionId)}`, { title });
 }
 
 export async function searchMessages(query: string, limit?: number): Promise<MessageRow[]> {
-  if (isTauri()) {
+  if (await useLocalDb()) {
     const t = await tauri();
     return t.invoke<MessageRow[]>("search_messages", {
       query,
@@ -428,7 +431,40 @@ export async function searchMessages(query: string, limit?: number): Promise<Mes
   }
   const params = new URLSearchParams({ q: query });
   if (limit != null) params.set("limit", String(limit));
-  return webApi<MessageRow[]>("GET", `/api/search?${params.toString()}`);
+  return serverApi<MessageRow[]>("GET", `/api/search?${params.toString()}`);
+}
+
+/** One-time migration: push the desktop app's LOCAL chat history up to the
+ *  server so it's unified with the web UI. Idempotent — skips sessions already
+ *  on the server. Runs only in the desktop app while in Remote mode. */
+export async function migrateLocalHistoryToServer(): Promise<{ migrated: number }> {
+  if (!isTauri()) return { migrated: 0 };
+  const cfg = await getConfig();
+  if (cfg.transport.mode !== "remote") return { migrated: 0 };
+  const t = await tauri();
+  // Read straight from the LOCAL DB via the Tauri commands (which always use it).
+  const local = await t.invoke<SessionRow[]>("list_sessions", { limit: 1000 });
+  if (!local.length) return { migrated: 0 };
+  const onServer = await serverApi<SessionRow[]>("GET", "/api/sessions?limit=1000").catch(() => []);
+  const have = new Set((Array.isArray(onServer) ? onServer : []).map((s) => s.id));
+  let migrated = 0;
+  for (const s of local) {
+    if (have.has(s.id)) continue;
+    try {
+      const msgs = await t.invoke<MessageRow[]>("load_messages", { sessionId: s.id });
+      await serverApi<unknown>("POST", `/api/sessions/${encodeURIComponent(s.id)}/persist`, {
+        session_id: s.id,
+        title: s.title,
+        claude_session_id: s.claude_session_id,
+        total_cost_delta: s.total_cost,
+        messages: msgs.map((m) => ({ idx: m.idx, role: m.role, content_json: m.content_json })),
+      });
+      migrated++;
+    } catch (e) {
+      console.warn("migrate session failed", s.id, e);
+    }
+  }
+  return { migrated };
 }
 
 // ---------- Settings (Tauri-only — transport toggle is meaningless in browser) ----------

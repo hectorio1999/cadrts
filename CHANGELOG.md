@@ -2,6 +2,19 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.1] — 2026-06-10 — "Unified history"
+
+### Fixed
+- **Chat history now lives on the server in Remote mode**, so it's the same in
+  the desktop app and the web UI (and on any device you sign into). Previously
+  the desktop app saved transcripts to a local DB on your machine while the web
+  UI read the server's DB — so the two never matched. Session list/load/save/
+  delete/rename/search now route to the configured server when in Remote mode.
+- **One-time migration:** on first launch after updating (Remote mode), the
+  desktop app pushes your existing local history up to the server so nothing is
+  lost and it all appears in the web UI. Idempotent; skips anything already
+  there. (Local mode is unchanged — history stays local.)
+
 ## [0.9.0] — 2026-06-10 — "Themes"
 
 ### Added
