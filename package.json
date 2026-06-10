@@ -1,13 +1,14 @@
 {
   "name": "claude-agent-desktop",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
     "dev:web": "vite",
     "build": "tsc --noEmit && vite build && tauri build",
     "build:web": "tsc --noEmit && vite build",
+    "gen:skills": "npx --yes esbuild src/lib/skills/index.ts --bundle --format=esm --platform=node --outfile=.skills-bundle.mjs && node scripts/gen-skill-seed.mjs && node -e \"require('fs').rmSync('.skills-bundle.mjs',{force:true})\"",
     "tauri": "tauri"
   },
   "dependencies": {

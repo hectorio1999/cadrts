@@ -2,6 +2,30 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.5.0] — 2026-06-10 — "Automatic & Self-Improving Skills"
+
+The skill system is now invisible and automatic — and grows with you.
+
+### Added
+- **Base skills available by default.** The full library is generated to markdown
+  (`seed-skills/`), embedded in the binary, and seeded into every agent's
+  `skills/base/` on boot. No install, activation, or manual invocation.
+- **Automatic skill selection.** Every turn's system prompt now includes a
+  compact catalog of all skills (name + when-to-use). The agent silently applies
+  the best-fitting skill when a request matches — the user never names a skill.
+  Replaces the old crude keyword substring-matching with model-driven selection.
+- **Self-improvement.** When a request would benefit from a reusable workflow the
+  agent lacks, it writes a new skill file to the user's `skills/` directory after
+  finishing. The next turn's catalog picks it up automatically — the agent
+  becomes more capable and personalized the more it's used.
+- `scripts/gen-skill-seed.mjs` + `npm run gen:skills` to regenerate the base
+  markdown from the TypeScript library (single source of truth).
+
+### Changed
+- `memory.rs` system-prompt builder: memory + always-on guidance + skill catalog
+  + self-improvement instructions. The `⚡ skill` library UI is now an optional
+  way to *force* a skill; automatic selection is the default.
+
 ## [0.4.0] — 2026-06-10 — "General-Purpose Skill Library"
 
 Turns the skill system from a handful of dev workflows into a broad

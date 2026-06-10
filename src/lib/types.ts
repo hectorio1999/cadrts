@@ -98,6 +98,7 @@ export type AgentEventEnvelope =
 
 export type SkillTrigger =
   | { kind: "always" }
+  | { kind: "auto" }
   | { kind: "keyword"; keywords: string[] }
   | { kind: "manual" }
   | { kind: "never" };
@@ -105,6 +106,7 @@ export type SkillTrigger =
 export type Skill = {
   name: string;
   description: string | null;
+  when?: string | null;
   trigger: SkillTrigger;
   body: string;
   path: string;

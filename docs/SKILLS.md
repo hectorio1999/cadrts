@@ -9,17 +9,26 @@ The library is general-purpose: software engineering is one of eleven
 categories, alongside writing, research, business, productivity, data, documents,
 design, learning, creative, and IT/homelab.
 
-## How it works
+## How it works — automatic by default
 
-1. **Browse** — the `⚡ skill` button by the composer opens the Skill Library:
-   browse by category, search, and open any skill to see its full detail and
-   example prompts.
-2. **Use** — "Use this skill" (or clicking an example prompt) attaches the skill
-   to your next message. A chip shows which skill is attached; ✕ removes it.
-3. **Run** — when you send, the skill's structured fields are composed into a
-   directive that is prepended to the prompt the agent receives. Your visible
-   message stays just what you typed; the directive rides along invisibly and
-   does **not** affect keyword-skill matching.
+The skill system is **invisible and automatic**. You don't install, activate, or
+name skills. The full base library is available to the agent on every turn, and
+the agent applies the right one on its own.
+
+1. **Seeded by default** — on boot, the base library is written into the agent's
+   `skills/base/` directory (embedded in the binary, so it's always present).
+2. **Catalogued every turn** — the agent's system prompt includes a compact
+   catalog of every skill (name + when-to-use). When your request matches a
+   skill's purpose, the agent silently follows that workflow — reading the full
+   skill file for the steps. You never have to ask for it by name.
+3. **Self-improving** — when a request would benefit from a reusable workflow the
+   agent doesn't have, it writes a new skill file to your `skills/` directory
+   after finishing. The next turn's catalog picks it up automatically, so the
+   agent gets more capable and personalized the more you use it.
+
+The **⚡ skill** button still opens the Skill Library to browse, search, and
+*explicitly* attach a skill if you ever want to force one — but it's optional.
+Automatic selection is the default behavior.
 
 A skill never bypasses your safety settings. The composer's permission mode
 (Plan / Ask / Auto-edit / Full) and tool toggles still apply. Read-only skills

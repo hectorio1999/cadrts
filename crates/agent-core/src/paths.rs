@@ -9,7 +9,14 @@
 //! On first launch we create the directory and seed empty defaults.
 
 use anyhow::{Context, Result};
+use include_dir::{include_dir, Dir};
 use std::path::PathBuf;
+
+/// Base skill library, embedded at compile time from `seed-skills/` (generated
+/// from the TypeScript library by `scripts/gen-skill-seed.mjs`). Seeded into
+/// every agent's `skills/base/` on boot so the full library is available by
+/// default — no install or activation needed.
+static BASE_SKILLS: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../seed-skills");
 
 /// Root user-data dir. Honored override: `CLAUDE_AGENT_DESKTOP_HOME`.
 pub fn app_home() -> Result<PathBuf> {
@@ -32,6 +39,13 @@ pub fn skills_dir() -> Result<PathBuf> {
     Ok(app_home()?.join("skills"))
 }
 
+/// Where the app-owned base skill library is seeded. Kept separate from the
+/// user's own skills (which live directly under `skills/`) so we can refresh
+/// the base library on every boot without ever clobbering user-created skills.
+pub fn base_skills_dir() -> Result<PathBuf> {
+    Ok(skills_dir()?.join("base"))
+}
+
 pub fn logs_dir() -> Result<PathBuf> {
     Ok(app_home()?.join("logs"))
 }
@@ -43,6 +57,20 @@ pub fn ensure_layout() -> Result<()> {
     std::fs::create_dir_all(&home).with_context(|| format!("mkdir {}", home.display()))?;
     std::fs::create_dir_all(skills_dir()?)?;
     std::fs::create_dir_all(logs_dir()?)?;
+
+    // Refresh the base skill library every boot — these are app-owned and
+    // versioned with the binary. User-created skills live under skills/ (not
+    // skills/base/) and are never touched here.
+    let base = base_skills_dir()?;
+    std::fs::create_dir_all(&base)?;
+    for f in BASE_SKILLS.files() {
+        if let Some(name) = f.path().file_name() {
+            let dest = base.join(name);
+            if let Err(e) = std::fs::write(&dest, f.contents()) {
+                tracing::warn!(error = ?e, file = ?name, "failed to seed base skill");
+            }
+        }
+    }
 
     let mem = memory_path()?;
     if !mem.exists() {

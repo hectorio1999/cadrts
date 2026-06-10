@@ -210,6 +210,8 @@ function triggerSummary(s: Skill): string {
   switch (s.trigger.kind) {
     case "always":
       return "trigger: always";
+    case "auto":
+      return "trigger: auto (applied automatically)";
     case "keyword":
       return `trigger: keyword: ${s.trigger.keywords.join(", ")}`;
     case "manual":
