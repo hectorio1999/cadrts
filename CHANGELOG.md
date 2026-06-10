@@ -2,6 +2,13 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.2] — 2026-06-10
+
+### Changed
+- **Update button moved into the status bar**, just left of the inspector
+  toggle (was a floating pill in the bottom-right corner). Compact `+{N} Update`
+  chip; still opens the "What's new" modal.
+
 ## [0.9.1] — 2026-06-10 — "Unified history"
 
 ### Fixed

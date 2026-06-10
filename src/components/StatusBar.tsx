@@ -1,4 +1,5 @@
 import { useStore } from "../lib/store";
+import UpdateBadge from "./UpdateBadge";
 
 export default function StatusBar() {
   const auth = useStore((s) => s.auth);
@@ -36,6 +37,7 @@ export default function StatusBar() {
         </>
       )}
       <div className="flex-1" />
+      <UpdateBadge />
       <button
         onClick={toggleInspector}
         className="hover:text-zinc-200"

@@ -112,15 +112,14 @@ export default function UpdateBadge() {
       <button
         onClick={() => setOpen(true)}
         title={`${version.commits_ahead} change${version.commits_ahead === 1 ? "" : "s"} available — click to see what's new`}
-        className="fixed bottom-10 right-4 z-40 flex items-center gap-2 rounded-full border border-accent/60 bg-ink-800 px-3 py-1.5 text-xs font-mono text-accent shadow-lg hover:bg-ink-700"
+        className="flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 font-mono text-accent hover:bg-accent/20"
       >
         {version.commits_ahead > 0 && (
-          <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-ink-900">
+          <span className="rounded-full bg-accent px-1 text-[9px] font-semibold leading-tight text-ink-900">
             +{version.commits_ahead}
           </span>
         )}
         <span>Update</span>
-        <span className="h-2 w-2 rounded-full bg-accent pulse-dot" />
       </button>
       {open && (
         <UpdateModal

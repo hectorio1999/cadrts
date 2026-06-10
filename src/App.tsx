@@ -10,7 +10,6 @@ import SettingsModal from "./components/SettingsModal";
 import SkillsManager from "./components/SkillsManager";
 import StatusBar from "./components/StatusBar";
 import ToastHost from "./components/ToastHost";
-import UpdateBadge from "./components/UpdateBadge";
 import WebLogin from "./components/WebLogin";
 import { authStatus, getConfig, migrateLocalHistoryToServer, testRemoteConnection } from "./lib/ipc";
 import { isTauri } from "./lib/runtime";
@@ -155,7 +154,6 @@ export default function App() {
         onOpenSkills={() => setSkillsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <UpdateBadge />
       <ToastHost />
     </div>
   );
