@@ -119,6 +119,10 @@ pub struct StartTurnBody {
     pub resume_session_id: Option<String>,
     pub permission_mode: Option<PermissionMode>,
     pub allowed_tools: Option<Vec<String>>,
+    #[serde(default)]
+    pub disallowed_tools: Option<Vec<String>>,
+    #[serde(default)]
+    pub skill_directive: Option<String>,
     pub cwd: Option<String>,
     /// The caller's `~/.claude/.credentials.json` bytes.
     ///
@@ -155,6 +159,8 @@ pub async fn start_turn(
         append_system_prompt: append,
         permission_mode: body.permission_mode,
         allowed_tools: body.allowed_tools,
+        disallowed_tools: body.disallowed_tools,
+        skill_directive: body.skill_directive,
         cwd: body.cwd,
         credentials_json: body.credentials_json,
     };
@@ -377,6 +383,8 @@ pub async fn read_skill(
     State(_state): State<Arc<ServerState>>,
     Path(name): Path<String>,
 ) -> Result<String, (StatusCode, String)> {
+    // Same path-traversal guard as the write path — the name comes from the URL.
+    validate_skill_name(&name)?;
     let path = paths::skills_dir().map_err(internal)?.join(format!("{name}.md"));
     std::fs::read_to_string(&path).map_err(|e| internal(anyhow::anyhow!(e)))
 }
@@ -387,16 +395,24 @@ pub async fn write_skill(
     Path(name): Path<String>,
     body: String,
 ) -> Result<Json<()>, (StatusCode, String)> {
-    // Defence in depth: the path comes from the URL, so reject anything weird.
-    if name.contains(['/', '\\', '.', '\0']) || name.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "invalid skill name".into()));
-    }
+    validate_skill_name(&name)?;
     let path = paths::skills_dir().map_err(internal)?.join(format!("{name}.md"));
     std::fs::write(&path, body).map_err(|e| internal(anyhow::anyhow!(e)))?;
     Ok(Json(()))
 }
 
 // -------------------- helpers --------------------
+
+/// Reject skill names that could escape the skills directory or hit dotfiles.
+/// Applied on both read and write since the name is caller-supplied. `:` is
+/// rejected too (NTFS alternate-data-stream writes) so the guard holds if the
+/// server is ever run on Windows.
+fn validate_skill_name(name: &str) -> Result<(), (StatusCode, String)> {
+    if name.is_empty() || name.contains(['/', '\\', '.', ':', '\0']) {
+        return Err((StatusCode::BAD_REQUEST, "invalid skill name".into()));
+    }
+    Ok(())
+}
 
 fn internal<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())

@@ -236,6 +236,9 @@ async function startTurnBrowser(
       resume_session_id: args.resume_session_id ?? null,
       permission_mode: args.permission_mode ?? null,
       allowed_tools: args.allowed_tools ?? null,
+      disallowed_tools: args.disallowed_tools ?? null,
+      skill_directive: args.skill_directive ?? null,
+      // cwd is a path on the *server's* filesystem in remote mode.
       cwd: args.cwd ?? null,
       // Browser has no filesystem access to a local credentials.json,
       // so we omit and let the server fall back to its own.

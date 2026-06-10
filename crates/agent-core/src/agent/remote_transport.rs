@@ -98,6 +98,8 @@ struct StartTurnBody<'a> {
     resume_session_id: Option<&'a str>,
     permission_mode: Option<&'a str>,
     allowed_tools: Option<&'a [String]>,
+    disallowed_tools: Option<&'a [String]>,
+    skill_directive: Option<&'a str>,
     cwd: Option<&'a str>,
     /// Omitted entirely. The server uses its own credentials file (see
     /// the multi-tenant story documented in `agent-server/src/api.rs`).
@@ -154,6 +156,8 @@ impl AgentTransport for RemoteTransport {
             resume_session_id: req.resume_session_id.as_deref(),
             permission_mode: perm,
             allowed_tools: req.allowed_tools.as_deref(),
+            disallowed_tools: req.disallowed_tools.as_deref(),
+            skill_directive: req.skill_directive.as_deref(),
             cwd: req.cwd.as_deref(),
             credentials_json: None,
         };

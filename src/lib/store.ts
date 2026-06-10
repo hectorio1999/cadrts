@@ -8,6 +8,8 @@ import {
   loadMessages as ipcLoadMessages,
   persistSession as ipcPersistSession,
 } from "./ipc";
+import { loadWorkspace, loadRecents, saveWorkspace, pushRecent } from "./workspace";
+import { loadPrefs, savePrefs, type AgentPrefs } from "./prefs";
 import type {
   AgentEvent,
   AgentEventEnvelope,
@@ -17,6 +19,8 @@ import type {
   PersistedContent,
   Session,
   SessionRow,
+  Toast,
+  ToastKind,
   ToolRun,
   TurnOutcome,
 } from "./types";
@@ -34,6 +38,16 @@ type State = {
   session: Session;
   messages: ChatMessage[];
 
+  // Active project root the agent operates in (sent as `cwd` on every turn).
+  // null = run in the agent's default HOME (no project).
+  workspace: string | null;
+  workspaceRecents: string[];
+  setWorkspace: (path: string | null) => void;
+
+  // Agent preferences (permission mode + allowed tools), persisted.
+  prefs: AgentPrefs;
+  setPrefs: (patch: Partial<AgentPrefs>) => void;
+
   // Current in-flight turn metadata.
   currentTurnId: string | null;
   streaming: boolean;
@@ -45,9 +59,14 @@ type State = {
   selectedToolRunId: string | null;
   selectToolRun: (id: string | null) => void;
 
+  // Transient notifications.
+  toasts: Toast[];
+  pushToast: (kind: ToastKind, message: string) => void;
+  dismissToast: (id: string) => void;
+
   // Mutations called from ChatPane/Composer.
-  appendUserMessage: (text: string) => string; // returns assistant message id
-  beginAssistantMessage: () => string;          // returns assistant message id
+  appendUserMessage: (text: string) => string; // returns the new user message id
+  beginAssistantMessage: () => string;          // returns the new assistant message id
   appendAssistantText: (msgId: string, delta: string) => void;
   upsertToolRun: (msgId: string, run: ToolRun) => void;
   completeToolRun: (toolUseId: string, content: unknown, isError: boolean) => void;
@@ -127,6 +146,23 @@ export const useStore = create<State>((set, get) => ({
   session: makeSession(),
   messages: [],
 
+  workspace: loadWorkspace(),
+  workspaceRecents: loadRecents(),
+  setWorkspace: (path) => {
+    saveWorkspace(path);
+    set({
+      workspace: path,
+      workspaceRecents: path ? pushRecent(path) : get().workspaceRecents,
+    });
+  },
+
+  prefs: loadPrefs(),
+  setPrefs: (patch) => {
+    const next = { ...get().prefs, ...patch };
+    savePrefs(next);
+    set({ prefs: next });
+  },
+
   currentTurnId: null,
   streaming: false,
   lastOutcome: null,
@@ -135,6 +171,18 @@ export const useStore = create<State>((set, get) => ({
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   selectedToolRunId: null,
   selectToolRun: (id) => set({ selectedToolRunId: id }),
+
+  toasts: [],
+  pushToast: (kind, message) => {
+    const id = uuid();
+    set((s) => ({ toasts: [...s.toasts, { id, kind, message }] }));
+    // Errors stay until dismissed (they often matter — e.g. a failed save);
+    // info/success auto-expire.
+    if (kind !== "error") {
+      window.setTimeout(() => get().dismissToast(id), 4000);
+    }
+  },
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   appendUserMessage: (text) => {
     const id = uuid();
@@ -268,8 +316,11 @@ export const useStore = create<State>((set, get) => ({
       })
         .then(() => get().refreshSessions())
         .catch(() => {
-          // Surface to console; the user can re-fire by sending another message.
-          console.warn("persist_session failed");
+          // Don't fail silently — a lost persist means lost history.
+          get().pushToast(
+            "error",
+            "Couldn't save this session. Your latest messages may not persist.",
+          );
         });
       if (title !== cur.session.title) {
         set({ session: { ...cur.session, title } });
@@ -278,7 +329,12 @@ export const useStore = create<State>((set, get) => ({
     }
     if (env.kind === "error") {
       set({ streaming: false });
-      // Surface as an assistant message so the user sees it.
+      // Close out any half-streamed assistant bubble first, otherwise its
+      // caret never stops AND the next turn's text would append into it
+      // (routeEvent targets the last unfinished assistant message).
+      const stale = s.messages.findLast?.((m) => m.role === "assistant" && !m.done);
+      if (stale) s.finishAssistantMessage(stale.id);
+      // Surface the failure as its own assistant message.
       const id = s.beginAssistantMessage();
       s.appendAssistantText(id, `⚠ transport error: ${env.message}`);
       s.finishAssistantMessage(id);

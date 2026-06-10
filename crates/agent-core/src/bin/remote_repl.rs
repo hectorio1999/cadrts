@@ -60,6 +60,8 @@ async fn main() -> anyhow::Result<()> {
         append_system_prompt: None,
         permission_mode: Some(PermissionMode::AcceptEdits),
         allowed_tools: Some(vec!["Bash".into(), "Read".into(), "Glob".into(), "Grep".into()]),
+        disallowed_tools: None,
+        skill_directive: None,
         cwd: None,
         // Unused by RemoteTransport (it reads creds from disk and uploads
         // them itself), but kept here to make the request shape obvious.

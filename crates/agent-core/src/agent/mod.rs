@@ -31,8 +31,19 @@ pub struct TurnRequest {
     pub append_system_prompt: Option<String>,
     /// Permission mode. Defaults to `acceptEdits` if None.
     pub permission_mode: Option<PermissionMode>,
-    /// If set, restrict the agent to this allow-list of tools.
+    /// Tools to pre-approve (Claude Code's `--allowed-tools` is an auto-approve
+    /// allow-list, NOT a restriction). Auto-approved tools skip the permission
+    /// prompt in `default`/`plan` modes.
     pub allowed_tools: Option<Vec<String>>,
+    /// Tools to withhold entirely (Claude Code's `--disallowed-tools`). This is
+    /// the real restriction: a disallowed tool cannot run regardless of mode.
+    #[serde(default)]
+    pub disallowed_tools: Option<Vec<String>>,
+    /// Optional workflow directive prepended to the prompt the agent receives.
+    /// Kept separate from `prompt` so keyword-skill matching and the visible
+    /// transcript see only the user's raw text.
+    #[serde(default)]
+    pub skill_directive: Option<String>,
     /// Working directory the agent runs in (defaults to user home).
     pub cwd: Option<String>,
     /// Raw bytes of the caller's `~/.claude/.credentials.json`.

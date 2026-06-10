@@ -18,7 +18,12 @@ export type StartTurnArgs = {
   prompt: string;
   resume_session_id?: string | null;
   permission_mode?: PermissionMode | null;
+  /** Tools to auto-approve (Claude Code `--allowed-tools`; an allow-list, not a restriction). */
   allowed_tools?: string[] | null;
+  /** Tools to withhold entirely (Claude Code `--disallowed-tools`; the real restriction). */
+  disallowed_tools?: string[] | null;
+  /** Workflow directive prepended to the prompt the agent receives (kept out of the transcript). */
+  skill_directive?: string | null;
   cwd?: string | null;
 };
 
@@ -106,6 +111,9 @@ export type Skill = {
 };
 
 // --- UI domain types (frontend-only) ---
+
+export type ToastKind = "error" | "info" | "success";
+export type Toast = { id: string; kind: ToastKind; message: string };
 
 export type ChatRole = "user" | "assistant" | "system";
 

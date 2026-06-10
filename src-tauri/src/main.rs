@@ -15,14 +15,14 @@ fn main() {
         tracing::warn!(error = ?e, "failed to seed app data dir");
     }
 
+    // A missing `claude` CLI no longer fails boot — build_transport falls back
+    // to an unresolved transport so the AuthGate can render. This only errors on
+    // genuinely fatal init (e.g. the SQLite state file can't be opened).
     let state = match AppState::new() {
         Ok(s) => s,
         Err(e) => {
-            tracing::error!(error = ?e, "failed to initialize app state");
-            // Boot the UI anyway so the AuthGate can render its sign-in prompt.
-            // We still need *some* state object; return early with a panic.
-            // (In practice, AppState::new only fails if claude.exe is missing.)
-            panic!("could not initialize app state: {e}");
+            tracing::error!(error = ?e, "fatal: could not initialize app state");
+            panic!("could not initialize app state (state DB unavailable): {e}");
         }
     };
 

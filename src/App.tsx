@@ -8,6 +8,7 @@ import SessionSidebar from "./components/SessionSidebar";
 import SettingsModal from "./components/SettingsModal";
 import SkillsManager from "./components/SkillsManager";
 import StatusBar from "./components/StatusBar";
+import ToastHost from "./components/ToastHost";
 import UpdateBadge from "./components/UpdateBadge";
 import WebLogin from "./components/WebLogin";
 import { authStatus, getConfig, testRemoteConnection } from "./lib/ipc";
@@ -125,6 +126,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <UpdateBadge />
+      <ToastHost />
     </div>
   );
 }

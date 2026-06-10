@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authStatus, launchLogin } from "../lib/ipc";
 import { useStore } from "../lib/store";
 
@@ -15,6 +15,15 @@ export default function AuthGate() {
   const setAuth = useStore((s) => s.setAuth);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+
+  // Always clear the sign-in poll if the gate unmounts (e.g. auth flips from
+  // another source) so we never leak a 1Hz interval.
+  useEffect(() => {
+    return () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    };
+  }, []);
 
   async function onSignIn() {
     setError(null);
@@ -23,19 +32,22 @@ export default function AuthGate() {
       await launchLogin();
       // Poll once per second for up to 10 minutes.
       const start = Date.now();
-      const id = setInterval(async () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+      pollRef.current = window.setInterval(async () => {
         try {
           const s = await authStatus();
           setAuth(s);
           if (s.authenticated) {
-            clearInterval(id);
+            if (pollRef.current !== null) window.clearInterval(pollRef.current);
+            pollRef.current = null;
             setWorking(false);
           } else if (Date.now() - start > 10 * 60_000) {
-            clearInterval(id);
+            if (pollRef.current !== null) window.clearInterval(pollRef.current);
+            pollRef.current = null;
             setWorking(false);
             setError("Timed out waiting for sign-in.");
           }
-        } catch (e) {
+        } catch {
           /* keep trying */
         }
       }, 1000);

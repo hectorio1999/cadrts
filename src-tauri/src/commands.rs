@@ -62,7 +62,16 @@ impl AppState {
 /// don't want the app to fail to boot if the LXC is down.
 fn build_transport(mode: &TransportMode) -> anyhow::Result<Arc<dyn AgentTransport>> {
     match mode {
-        TransportMode::Local => Ok(Arc::new(CliTransport::discover()?)),
+        TransportMode::Local => match CliTransport::discover() {
+            Ok(t) => Ok(Arc::new(t)),
+            Err(e) => {
+                // Don't fail boot just because the CLI isn't installed yet — the
+                // app should still come up so the user sees sign-in/install help.
+                // The next turn will surface a clear error if it's truly missing.
+                tracing::warn!(error = ?e, "claude CLI not found at boot; deferring to turn time");
+                Ok(Arc::new(CliTransport::unresolved()))
+            }
+        },
         TransportMode::Remote { base_url, token } => {
             let t = RemoteTransport::new(RemoteConfig {
                 base_url: base_url.clone(),
@@ -83,6 +92,10 @@ pub struct StartTurnArgs {
     pub resume_session_id: Option<String>,
     pub permission_mode: Option<PermissionMode>,
     pub allowed_tools: Option<Vec<String>>,
+    #[serde(default)]
+    pub disallowed_tools: Option<Vec<String>>,
+    #[serde(default)]
+    pub skill_directive: Option<String>,
     pub cwd: Option<String>,
 }
 
@@ -109,7 +122,8 @@ pub fn launch_login() -> Result<(), String> {
     // still signs in on *their* machine — the resulting credentials are
     // what the desktop client uploads to the server with each turn.
     let local = CliTransport::discover().map_err(|e| e.to_string())?;
-    auth::launch_login(local.binary()).map_err(|e| e.to_string())
+    let bin = local.binary().map_err(|e| e.to_string())?;
+    auth::launch_login(&bin).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -146,6 +160,8 @@ pub async fn start_turn(
     args: StartTurnArgs,
     on_event: Channel<AgentEventEnvelope>,
 ) -> Result<TurnOutcome, String> {
+    // Keyword-skill matching runs against the user's raw text only — the
+    // workflow directive (if any) is applied separately by the transport.
     let append = memory::build_system_append(&args.prompt).map_err(|e| e.to_string())?;
     let req = TurnRequest {
         prompt: args.prompt.clone(),
@@ -153,6 +169,8 @@ pub async fn start_turn(
         append_system_prompt: append,
         permission_mode: args.permission_mode,
         allowed_tools: args.allowed_tools.clone(),
+        disallowed_tools: args.disallowed_tools.clone(),
+        skill_directive: args.skill_directive.clone(),
         cwd: args.cwd.clone(),
         // Local-mode: child inherits the user's HOME. The bring-your-own-creds
         // path is reserved for the agent-server runner.

@@ -31,7 +31,9 @@ use tracing::{debug, info, warn};
 /// Builds + spawns the `claude` CLI for each turn.
 pub struct CliTransport {
     /// Resolved path to `claude.exe` (or `claude` on macOS/Linux).
-    binary: PathBuf,
+    /// `None` = not yet located (graceful-boot fallback); resolved lazily at
+    /// turn time so a mid-session install is picked up without an app restart.
+    binary: Option<PathBuf>,
 }
 
 impl CliTransport {
@@ -48,7 +50,7 @@ impl CliTransport {
             let p = PathBuf::from(v);
             if p.exists() {
                 info!(binary = %p.display(), "using CLAUDE_BIN override");
-                return Ok(Self { binary: p });
+                return Ok(Self { binary: Some(p) });
             }
         }
 
@@ -64,7 +66,7 @@ impl CliTransport {
                     .join("claude.exe");
                 if p.exists() {
                     info!(binary = %p.display(), "found bundled claude.exe");
-                    return Ok(Self { binary: p });
+                    return Ok(Self { binary: Some(p) });
                 }
             }
         }
@@ -73,7 +75,7 @@ impl CliTransport {
         let exe = if cfg!(windows) { "claude.exe" } else { "claude" };
         if let Ok(found) = which(exe) {
             info!(binary = %found.display(), "found claude on PATH");
-            return Ok(Self { binary: found });
+            return Ok(Self { binary: Some(found) });
         }
 
         bail!(
@@ -83,8 +85,25 @@ impl CliTransport {
         )
     }
 
-    pub fn binary(&self) -> &PathBuf {
-        &self.binary
+    /// Construct without locating the CLI. Lets the app boot and show
+    /// sign-in/install guidance instead of crashing when the CLI isn't
+    /// installed yet. The binary is resolved lazily on the next turn, so a
+    /// mid-session `npm install -g @anthropic-ai/claude-code` is picked up
+    /// without an app restart — and if it's still missing, the turn surfaces
+    /// `discover()`'s full install instructions.
+    pub fn unresolved() -> Self {
+        Self { binary: None }
+    }
+
+    /// Resolve the binary path now, re-running discovery if we booted
+    /// unresolved. Propagates `discover()`'s rich error when still missing.
+    pub fn binary(&self) -> Result<PathBuf> {
+        match &self.binary {
+            Some(p) => Ok(p.clone()),
+            None => Self::discover().map(|t| {
+                t.binary.expect("discover() always resolves to Some")
+            }),
+        }
     }
 }
 
@@ -159,9 +178,22 @@ impl AgentTransport for CliTransport {
             None
         };
 
-        let mut cmd = Command::new(&self.binary);
+        // Resolve the CLI now (re-runs discovery if we booted unresolved, so a
+        // mid-session install works and the rich "install Claude Code" error
+        // surfaces in chat rather than a bare "program not found").
+        let binary = self.binary()?;
+
+        // A workflow skill (if attached) rides in `skill_directive`, kept out of
+        // `prompt` so keyword-skill matching and the transcript see only the
+        // user's text. Prepend it to what the agent actually receives.
+        let prompt = match &req.skill_directive {
+            Some(d) if !d.is_empty() => format!("{d}{}", req.prompt),
+            _ => req.prompt.clone(),
+        };
+
+        let mut cmd = Command::new(&binary);
         cmd.arg("-p")
-            .arg(&req.prompt)
+            .arg(&prompt)
             .arg("--output-format")
             .arg("stream-json")
             .arg("--verbose")
@@ -185,6 +217,13 @@ impl AgentTransport for CliTransport {
                 cmd.arg("--allowed-tools").arg(tools.join(","));
             }
         }
+        // The real restriction: disallowed tools cannot run regardless of mode.
+        // This is what the UI's "allowed tools" checkboxes withhold (unchecked).
+        if let Some(denied) = &req.disallowed_tools {
+            if !denied.is_empty() {
+                cmd.arg("--disallowed-tools").arg(denied.join(","));
+            }
+        }
 
         if let Some(home) = &creds_home {
             // Both names — the CLI's underlying Node `os.homedir()` reads
@@ -203,7 +242,7 @@ impl AgentTransport for CliTransport {
         debug!(?cmd, "spawning claude CLI");
         let mut child = cmd
             .spawn()
-            .with_context(|| format!("spawn {}", self.binary.display()))?;
+            .with_context(|| format!("spawn {}", binary.display()))?;
 
         let stdout = child
             .stdout

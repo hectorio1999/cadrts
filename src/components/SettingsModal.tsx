@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { getConfig, setConfig, testRemoteConnection } from "../lib/ipc";
 import type { TransportMode } from "../lib/types";
+import { useStore } from "../lib/store";
+import { ALL_TOOLS, PERMISSION_MODES } from "../lib/prefs";
 
 type Mode = "local" | "remote";
 type Probe = { state: "idle" | "running" | "ok" | "err"; message?: string };
@@ -78,9 +80,9 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       >
         <div className="px-4 py-3 border-b border-ink-600 flex items-center justify-between">
           <div>
-            <div className="font-semibold text-zinc-200">Settings · Agent transport</div>
+            <div className="font-semibold text-zinc-200">Settings</div>
             <div className="text-[11px] text-zinc-500 font-mono">
-              Where this client sends turns. Local spawns the CLI here; Remote talks to your agent-server.
+              Transport and agent defaults. Changes apply to your next message.
             </div>
           </div>
           <button
@@ -152,6 +154,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
           )}
+
+          <AgentPrefsSection />
         </div>
 
         {error && (
@@ -175,6 +179,76 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+function AgentPrefsSection() {
+  const prefs = useStore((s) => s.prefs);
+  const setPrefs = useStore((s) => s.setPrefs);
+
+  function toggleTool(tool: string) {
+    const has = prefs.allowedTools.includes(tool);
+    const allowedTools = has
+      ? prefs.allowedTools.filter((t) => t !== tool)
+      : [...prefs.allowedTools, tool];
+    setPrefs({ allowedTools });
+  }
+
+  return (
+    <div className="space-y-3 border-t border-ink-600 pt-4">
+      <div>
+        <div className="text-sm font-semibold text-zinc-200">Agent defaults</div>
+        <div className="font-mono text-[11px] text-zinc-500">
+          Applied to every turn. The permission mode is your main safety control.
+        </div>
+      </div>
+
+      <Field label="Permission mode" hint={modeHint(prefs.permissionMode)}>
+        <div className="grid grid-cols-2 gap-2">
+          {PERMISSION_MODES.map((m) => {
+            const active = prefs.permissionMode === m.value;
+            return (
+              <button
+                key={m.value}
+                onClick={() => setPrefs({ permissionMode: m.value })}
+                className={`rounded border px-2 py-1.5 text-left text-xs ${
+                  active ? "border-accent/60 bg-accent/5" : "border-ink-500 hover:bg-ink-600/30"
+                }`}
+              >
+                <div className="font-semibold text-zinc-200">{m.label}</div>
+                <div className="mt-0.5 text-[10px] leading-snug text-zinc-500">{m.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      <Field label="Allowed tools" hint="Tools the agent may call. Unchecked tools are withheld.">
+        <div className="flex flex-wrap gap-1.5">
+          {ALL_TOOLS.map((tool) => {
+            const on = prefs.allowedTools.includes(tool);
+            return (
+              <button
+                key={tool}
+                onClick={() => toggleTool(tool)}
+                className={`rounded border px-2 py-0.5 text-[11px] font-mono ${
+                  on
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-ink-500 text-zinc-500 hover:bg-ink-600/30"
+                }`}
+              >
+                {on ? "✓ " : ""}
+                {tool}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
+function modeHint(mode: string): string {
+  return PERMISSION_MODES.find((m) => m.value === mode)?.hint ?? "";
 }
 
 function Choice(props: {

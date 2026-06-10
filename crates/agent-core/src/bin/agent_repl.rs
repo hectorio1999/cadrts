@@ -50,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
     println!("prompt: {prompt}");
 
     let transport = CliTransport::discover()?;
-    println!("claude binary: {}", transport.binary().display());
+    println!("claude binary: {}", transport.binary()?.display());
 
     let append = memory::build_system_append(&prompt)?;
     println!(
@@ -64,6 +64,8 @@ async fn main() -> anyhow::Result<()> {
         append_system_prompt: append,
         permission_mode: Some(PermissionMode::AcceptEdits),
         allowed_tools: Some(vec!["Bash".into(), "Read".into(), "Glob".into(), "Grep".into()]),
+        disallowed_tools: None,
+        skill_directive: None,
         cwd: None,
         credentials_json: None,
     };
