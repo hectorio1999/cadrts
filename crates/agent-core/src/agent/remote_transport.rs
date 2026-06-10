@@ -100,6 +100,7 @@ struct StartTurnBody<'a> {
     allowed_tools: Option<&'a [String]>,
     disallowed_tools: Option<&'a [String]>,
     skill_directive: Option<&'a str>,
+    model: Option<&'a str>,
     cwd: Option<&'a str>,
     /// Omitted entirely. The server uses its own credentials file (see
     /// the multi-tenant story documented in `agent-server/src/api.rs`).
@@ -158,6 +159,7 @@ impl AgentTransport for RemoteTransport {
             allowed_tools: req.allowed_tools.as_deref(),
             disallowed_tools: req.disallowed_tools.as_deref(),
             skill_directive: req.skill_directive.as_deref(),
+            model: req.model.as_deref(),
             cwd: req.cwd.as_deref(),
             credentials_json: None,
         };

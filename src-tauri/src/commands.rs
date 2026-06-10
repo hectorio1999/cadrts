@@ -96,6 +96,8 @@ pub struct StartTurnArgs {
     pub disallowed_tools: Option<Vec<String>>,
     #[serde(default)]
     pub skill_directive: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
     pub cwd: Option<String>,
 }
 
@@ -171,6 +173,7 @@ pub async fn start_turn(
         allowed_tools: args.allowed_tools.clone(),
         disallowed_tools: args.disallowed_tools.clone(),
         skill_directive: args.skill_directive.clone(),
+        model: args.model.clone(),
         cwd: args.cwd.clone(),
         // Local-mode: child inherits the user's HOME. The bring-your-own-creds
         // path is reserved for the agent-server runner.

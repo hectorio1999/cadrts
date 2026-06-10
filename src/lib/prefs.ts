@@ -44,9 +44,20 @@ export const PERMISSION_MODES: {
   { value: "bypassPermissions", label: "Full access", hint: "No gating. The agent edits and runs commands freely." },
 ];
 
+/** Model choices. Empty string = the plan's default model. Aliases map to the
+ *  latest of each family; a full model id can also be set via the custom field. */
+export const MODELS: { value: string; label: string; hint: string }[] = [
+  { value: "", label: "Default", hint: "Whatever your plan uses by default." },
+  { value: "opus", label: "Opus", hint: "Most capable — best for hard reasoning and code." },
+  { value: "sonnet", label: "Sonnet", hint: "Balanced speed and capability." },
+  { value: "haiku", label: "Haiku", hint: "Fastest and cheapest — quick tasks." },
+];
+
 export type AgentPrefs = {
   permissionMode: PermissionMode;
   allowedTools: string[];
+  /** "" = default model; otherwise an alias (opus/sonnet/haiku) or full model id. */
+  model: string;
 };
 
 // Default: every tool checked. Because unchecked tools are now *withheld*
@@ -55,6 +66,7 @@ export type AgentPrefs = {
 export const DEFAULT_PREFS: AgentPrefs = {
   permissionMode: "acceptEdits",
   allowedTools: [...ALL_TOOLS],
+  model: "",
 };
 
 export function loadPrefs(): AgentPrefs {
@@ -70,7 +82,8 @@ export function loadPrefs(): AgentPrefs {
       mode === "plan" || mode === "default" || mode === "acceptEdits" || mode === "bypassPermissions"
         ? mode
         : DEFAULT_PREFS.permissionMode;
-    return { permissionMode: validMode, allowedTools: tools };
+    const model = typeof parsed.model === "string" ? parsed.model : "";
+    return { permissionMode: validMode, allowedTools: tools, model };
   } catch {
     return { ...DEFAULT_PREFS };
   }

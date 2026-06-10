@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
         allowed_tools: Some(vec!["Bash".into(), "Read".into(), "Glob".into(), "Grep".into()]),
         disallowed_tools: None,
         skill_directive: None,
+        model: None,
         cwd: None,
         // Unused by RemoteTransport (it reads creds from disk and uploads
         // them itself), but kept here to make the request shape obvious.

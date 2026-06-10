@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
         allowed_tools: Some(vec!["Bash".into(), "Read".into(), "Glob".into(), "Grep".into()]),
         disallowed_tools: None,
         skill_directive: None,
+        model: None,
         cwd: None,
         credentials_json: None,
     };

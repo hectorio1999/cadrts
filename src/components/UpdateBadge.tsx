@@ -111,14 +111,16 @@ export default function UpdateBadge() {
     <>
       <button
         onClick={() => setOpen(true)}
-        title={`${version.commits_ahead} commit${version.commits_ahead === 1 ? "" : "s"} ahead of running build`}
-        className="fixed bottom-10 right-4 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink-800 border border-accent/60 text-xs font-mono text-accent shadow-lg hover:bg-ink-700"
+        title={`${version.commits_ahead} change${version.commits_ahead === 1 ? "" : "s"} available — click to see what's new`}
+        className="fixed bottom-10 right-4 z-40 flex items-center gap-2 rounded-full border border-accent/60 bg-ink-800 px-3 py-1.5 text-xs font-mono text-accent shadow-lg hover:bg-ink-700"
       >
-        <span className="w-2 h-2 rounded-full bg-accent pulse-dot" />
-        update available
         {version.commits_ahead > 0 && (
-          <span className="text-zinc-400">· {version.commits_ahead}</span>
+          <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-ink-900">
+            +{version.commits_ahead}
+          </span>
         )}
+        <span>Update</span>
+        <span className="h-2 w-2 rounded-full bg-accent pulse-dot" />
       </button>
       {open && (
         <UpdateModal
@@ -180,7 +182,9 @@ function UpdateModal({
       >
         <div className="px-4 py-3 border-b border-ink-600 flex items-start justify-between">
           <div>
-            <div className="font-semibold text-zinc-100">Update available</div>
+            <div className="font-semibold text-zinc-100">
+              What's new{version.commits_ahead > 0 ? ` · +${version.commits_ahead}` : ""}
+            </div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
               running build{" "}
               <span className="text-zinc-300">
@@ -266,14 +270,14 @@ function UpdateModal({
               disabled={Boolean(phase)}
               className="px-3 py-1.5 text-sm rounded border border-ink-500 hover:bg-ink-600/40 disabled:opacity-50"
             >
-              later
+              Close
             </button>
             <button
               onClick={onUpdate}
               disabled={Boolean(phase)}
               className="px-3 py-1.5 text-sm rounded bg-accent text-ink-900 font-semibold disabled:opacity-50"
             >
-              {phase ?? "update now"}
+              {phase ?? "Update"}
             </button>
           </div>
         </div>

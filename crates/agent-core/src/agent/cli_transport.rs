@@ -224,6 +224,12 @@ impl AgentTransport for CliTransport {
                 cmd.arg("--disallowed-tools").arg(denied.join(","));
             }
         }
+        // Model override (alias like `opus`/`sonnet`/`haiku`, or a full id).
+        if let Some(model) = &req.model {
+            if !model.trim().is_empty() {
+                cmd.arg("--model").arg(model.trim());
+            }
+        }
 
         if let Some(home) = &creds_home {
             // Both names — the CLI's underlying Node `os.homedir()` reads

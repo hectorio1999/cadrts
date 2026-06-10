@@ -2,6 +2,20 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.6.0] — 2026-06-10 — "Model Picker & Update UX"
+
+### Added
+- **Model selection.** Pick the model per turn from the composer (next to Mode)
+  and in Settings: Default · Opus · Sonnet · Haiku, plus a custom field for a
+  full model id. Wired end-to-end to the `claude --model` flag. Switch mid-chat
+  (Opus for hard reasoning, Haiku for quick tasks). Persisted.
+
+### Changed
+- **Update button** reshaped: bottom-right pill now shows `+{N} Update` with the
+  change count. Clicking opens a "What's new" modal (recent changes) with
+  **Update** (downloads/installs in the desktop app, reloads in browser) and
+  **Close**.
+
 ## [0.5.0] — 2026-06-10 — "Automatic & Self-Improving Skills"
 
 The skill system is now invisible and automatic — and grows with you.

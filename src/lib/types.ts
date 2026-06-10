@@ -24,6 +24,8 @@ export type StartTurnArgs = {
   disallowed_tools?: string[] | null;
   /** Workflow directive prepended to the prompt the agent receives (kept out of the transcript). */
   skill_directive?: string | null;
+  /** Model alias (opus/sonnet/haiku) or full id. null/empty = plan default. */
+  model?: string | null;
   cwd?: string | null;
 };
 

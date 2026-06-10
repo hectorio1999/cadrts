@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getConfig, setConfig, testRemoteConnection } from "../lib/ipc";
 import type { TransportMode } from "../lib/types";
 import { useStore } from "../lib/store";
-import { ALL_TOOLS, PERMISSION_MODES } from "../lib/prefs";
+import { ALL_TOOLS, PERMISSION_MODES, MODELS } from "../lib/prefs";
 
 type Mode = "local" | "remote";
 type Probe = { state: "idle" | "running" | "ok" | "err"; message?: string };
@@ -201,6 +201,33 @@ function AgentPrefsSection() {
           Applied to every turn. The permission mode is your main safety control.
         </div>
       </div>
+
+      <Field label="Model" hint="Applied to every turn. Switch per-task from the composer too.">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {MODELS.map((m) => {
+            const active = prefs.model === m.value;
+            return (
+              <button
+                key={m.value || "default"}
+                onClick={() => setPrefs({ model: m.value })}
+                title={m.hint}
+                className={`rounded border px-2 py-1 text-xs ${
+                  active ? "border-accent/60 bg-accent/5 text-zinc-100" : "border-ink-500 text-zinc-400 hover:bg-ink-600/30"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+          <input
+            value={MODELS.some((m) => m.value === prefs.model) ? "" : prefs.model}
+            onChange={(e) => setPrefs({ model: e.target.value.trim() })}
+            placeholder="or full model id…"
+            spellCheck={false}
+            className="flex-1 min-w-[140px] rounded border border-ink-500 bg-ink-900 px-2 py-1 text-xs font-mono"
+          />
+        </div>
+      </Field>
 
       <Field label="Permission mode" hint={modeHint(prefs.permissionMode)}>
         <div className="grid grid-cols-2 gap-2">

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { cancelTurn, startTurn } from "../lib/ipc";
 import { useStore } from "../lib/store";
 import { v4 as uuid } from "../lib/uuid";
-import { PERMISSION_MODES, ALL_TOOLS } from "../lib/prefs";
+import { PERMISSION_MODES, ALL_TOOLS, MODELS } from "../lib/prefs";
 import { asDirective, type WorkflowSkill } from "../lib/skillLibrary";
 import type { PermissionMode } from "../lib/types";
 import MessageItem from "./MessageItem";
@@ -90,6 +90,7 @@ export default function ChatPane() {
           permission_mode: prefs.permissionMode,
           allowed_tools: prefs.allowedTools,
           disallowed_tools: disallowed,
+          model: prefs.model || null,
           // The active project root. null → agent runs in its default HOME.
           cwd: workspace,
         },
@@ -163,6 +164,8 @@ export default function ChatPane() {
             value={prefs.permissionMode}
             onChange={(m) => setPrefs({ permissionMode: m })}
           />
+          <span className="uppercase tracking-wide">Model</span>
+          <ModelSelect value={prefs.model} onChange={(m) => setPrefs({ model: m })} />
           <button
             onClick={() => setSkillLibraryOpen(true)}
             className="rounded border border-ink-500 px-1.5 py-0.5 text-zinc-300 hover:bg-ink-600/40"
@@ -261,6 +264,37 @@ function PermissionModeSelect({
           {m.label}
         </option>
       ))}
+    </select>
+  );
+}
+
+function ModelSelect({ value, onChange }: { value: string; onChange: (m: string) => void }) {
+  // A known alias shows in the dropdown; anything else is a custom model id.
+  const isKnown = MODELS.some((m) => m.value === value);
+  const active = MODELS.find((m) => m.value === value);
+  return (
+    <select
+      value={isKnown ? value : "__custom"}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v === "__custom") {
+          const id = window.prompt("Full model id:", value && !isKnown ? value : "");
+          onChange((id ?? "").trim());
+        } else {
+          onChange(v);
+        }
+      }}
+      title={active?.hint ?? (value ? `custom: ${value}` : "")}
+      className="rounded border border-ink-500 bg-ink-700/40 px-1.5 py-0.5 text-[10px] font-mono text-zinc-200 focus:border-accent/60"
+    >
+      {MODELS.map((m) => (
+        <option key={m.value || "default"} value={m.value} className="bg-ink-800">
+          {m.label}
+        </option>
+      ))}
+      <option value="__custom" className="bg-ink-800">
+        {isKnown ? "Custom…" : `Custom: ${value}`}
+      </option>
     </select>
   );
 }

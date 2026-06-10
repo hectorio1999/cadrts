@@ -123,6 +123,8 @@ pub struct StartTurnBody {
     pub disallowed_tools: Option<Vec<String>>,
     #[serde(default)]
     pub skill_directive: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
     pub cwd: Option<String>,
     /// The caller's `~/.claude/.credentials.json` bytes.
     ///
@@ -161,6 +163,7 @@ pub async fn start_turn(
         allowed_tools: body.allowed_tools,
         disallowed_tools: body.disallowed_tools,
         skill_directive: body.skill_directive,
+        model: body.model,
         cwd: body.cwd,
         credentials_json: body.credentials_json,
     };

@@ -44,6 +44,10 @@ pub struct TurnRequest {
     /// transcript see only the user's raw text.
     #[serde(default)]
     pub skill_directive: Option<String>,
+    /// Model for this turn — an alias (`opus`/`sonnet`/`haiku`) or a full model
+    /// id. `None`/empty = the plan default. Maps to the CLI `--model` flag.
+    #[serde(default)]
+    pub model: Option<String>,
     /// Working directory the agent runs in (defaults to user home).
     pub cwd: Option<String>,
     /// Raw bytes of the caller's `~/.claude/.credentials.json`.
