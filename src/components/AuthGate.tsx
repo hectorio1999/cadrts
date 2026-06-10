@@ -65,10 +65,10 @@ export default function AuthGate() {
           <div className="text-lg font-semibold">Claude Agent Desktop</div>
         </div>
         <div className="text-sm text-zinc-400 mb-4 leading-relaxed">
-          This app drives the Claude Agent SDK against your{" "}
-          <span className="text-accent">Max subscription</span>, not a
-          pay-per-token API key. Sign in once with the Claude CLI and every
-          turn from here on bills against your plan.
+          Sign in with your{" "}
+          <span className="text-accent">Claude account</span> and the app runs
+          against your existing plan — no API key, no per-token charges. One
+          quick OAuth sign-in and you're set.
         </div>
         {auth?.reason && (
           <div className="text-xs text-zinc-500 mb-4 leading-relaxed">

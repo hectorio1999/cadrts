@@ -13,7 +13,7 @@
 //!
 //! Auth: the credential file is uploaded with every turn; the server never
 //! persists it. Bearer auth on the wire is the server's gate, not the
-//! Max subscription auth (which lives in `claudeAiOauth`).
+//! Claude account auth (which lives in `claudeAiOauth`).
 
 use super::events::AgentEvent;
 use super::{AgentTransport, TurnHandle, TurnOutcome, TurnRequest};

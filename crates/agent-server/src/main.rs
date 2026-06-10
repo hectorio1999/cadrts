@@ -2,7 +2,7 @@
 //!
 //! Boots an HTTP+WS service on `0.0.0.0:9120` (configurable) that lets
 //! Tauri desktop clients (and, later, a browser UI) drive the Claude
-//! Agent SDK against the *client's own* Max subscription. The server
+//! Agent SDK against the *client's own* Claude account. The server
 //! never stores OAuth credentials — clients upload their
 //! `~/.claude/.credentials.json` bytes with every turn and the
 //! per-turn HOME isolation in `CliTransport` ensures the file is

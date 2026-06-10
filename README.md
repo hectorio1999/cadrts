@@ -2,8 +2,9 @@
 
 A local-first **and** Hermes-style remote-first desktop app that turns
 Claude into a persistent, tool-using agent with its own workspace. Built
-on top of Claude Code's authenticated runtime so every turn bills against
-your **Max subscription**, not a pay-per-token API key.
+on top of Claude Code's authenticated runtime so every turn runs on your
+**existing Claude plan** — sign in with your Claude account, no API key and
+no per-token charges.
 
 - Streaming agent loop with the SDK's built-in tools (Bash, Read/Write/Edit, Glob, Grep, WebFetch/WebSearch).
 - Tool calls render inline as collapsible cards. Real Stop button.
@@ -15,7 +16,7 @@ your **Max subscription**, not a pay-per-token API key.
   - **Local** — spawns `claude.exe` on this machine
   - **Remote** — talks to an [`agent-server`](docs/DEPLOYMENT.md) running
     in an LXC. Multiple desktop clients (laptop, Mac, work box) share one
-    central server. Each client uploads its own Max credentials per turn;
+    central server. Each client uploads its own Claude credentials per turn;
     the server isolates them in a per-turn temp HOME and never persists them.
   Toggle in Settings (sidebar gear or `Cmd+K`).
 
@@ -30,7 +31,7 @@ cd claude-agent-desktop
 # 1. Make sure Claude Code is installed (we drive its CLI under the hood).
 npm install -g @anthropic-ai/claude-code
 
-# 2. Authorise this machine against your Max subscription. One-time, OAuth.
+# 2. Sign in with your Claude account. One-time, OAuth.
 claude login
 
 # 3. Build the app.
@@ -49,15 +50,15 @@ On first run, the app:
 
 ---
 
-## Why a subscription, not an API key
+## Why your Claude account, not an API key
 
-The user-facing constraint is simple: this is an app for someone who already
-pays for Claude Max. If we used the Anthropic Messages API with an
-`ANTHROPIC_API_KEY`, every Bash call and every file edit would burn
-pay-per-token billing on top of the subscription you're already paying for.
+The idea is simple: sign in with the Claude account you already have. If we
+used the Anthropic Messages API with an `ANTHROPIC_API_KEY` instead, every
+Bash call and every file edit would burn pay-per-token billing on top of the
+plan you're already paying for.
 
-The only supported way to bill agent calls against a Max plan today is to
-sit on top of Claude Code's authenticated runtime. That means one of:
+Running on top of Claude Code's authenticated runtime bills each turn against
+your existing Claude plan (whatever tier includes Claude Code). That means one of:
 
 - The Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`), which calls the
   same auth path internally.

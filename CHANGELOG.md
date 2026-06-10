@@ -2,6 +2,14 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.3.1] — 2026-06-10
+
+### Changed
+- **Inclusive sign-in messaging.** Dropped the "Max subscription" framing
+  everywhere (sign-in screen, README, error text). The app works with any
+  Claude account that has Claude Code access — just sign in with your Claude
+  account; no API key, no per-token charges. Same OAuth flow, friendlier copy.
+
 ## [0.3.0] — 2026-06-10 — "Project Awareness & Premium UX"
 
 A major polish pass turning the chat client into a project-aware desktop AI

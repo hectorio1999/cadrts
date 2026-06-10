@@ -5,7 +5,7 @@
 //! implementation: [`cli_transport::CliTransport`], which spawns the bundled
 //! `claude.exe` from `@anthropic-ai/claude-code` in headless streaming JSON
 //! mode and parses its events. The CLI itself handles OAuth refresh against
-//! the user's Max subscription via `~/.claude/.credentials.json`.
+//! the user's Claude account via `~/.claude/.credentials.json`.
 //!
 //! A future `SdkTransport` (Node sidecar over `@anthropic-ai/claude-agent-sdk`)
 //! drops in behind this same trait without any UI churn.

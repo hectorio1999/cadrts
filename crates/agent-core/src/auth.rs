@@ -64,7 +64,7 @@ pub fn status() -> AuthStatus {
             scopes: None,
             credential_path: Some(path.to_string_lossy().to_string()),
             reason: Some(
-                "no Claude Code session found — run `claude login` to authorise this device against your Max subscription"
+                "no Claude Code session found — run `claude login` to sign in with your Claude account"
                     .into(),
             ),
         };
