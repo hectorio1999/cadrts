@@ -7,7 +7,7 @@ export default function MessageItem({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
       <div className="group flex justify-end">
-        <div className="relative max-w-[80%] rounded border border-ink-500 bg-ink-700/40 px-3 py-2 text-sm font-mono whitespace-pre-wrap text-zinc-100">
+        <div className="relative max-w-[80%] rounded-lg border border-accent/40 px-3 py-2 text-sm font-mono whitespace-pre-wrap text-zinc-100">
           {message.text}
           <div className="pointer-events-none absolute -bottom-4 right-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
             <CopyButton text={message.text} />

@@ -22,6 +22,12 @@ export default function App() {
   const auth = useStore((s) => s.auth);
   const inspectorOpen = useStore((s) => s.inspectorOpen);
   const refreshSessions = useStore((s) => s.refreshSessions);
+  const theme = useStore((s) => s.prefs.theme);
+
+  // Apply the selected color theme to <html data-theme>.
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme || "dark");
+  }, [theme]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [jobsOpen, setJobsOpen] = useState(false);

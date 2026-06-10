@@ -54,11 +54,25 @@ export const MODELS: { value: string; label: string; hint: string }[] = [
   { value: "haiku", label: "Haiku", hint: "Fastest and cheapest — quick tasks." },
 ];
 
+/** Color themes. `id` matches the `data-theme` attribute set on <html>.
+ *  `swatch`/`accent` drive the little preview chips in Settings. */
+export const THEMES: { id: string; label: string; hint: string; swatch: string; accent: string }[] = [
+  { id: "dark", label: "Dark", hint: "Tactical dark + orange (default).", swatch: "#0b0d10", accent: "#ff7a59" },
+  { id: "light", label: "Light", hint: "Clean light mode.", swatch: "#f7f7f8", accent: "#e35a36" },
+  { id: "nord", label: "Nord", hint: "Arctic blue-gray with a frost accent.", swatch: "#2e3440", accent: "#88c0d0" },
+  { id: "synthwave", label: "Synthwave", hint: "Deep indigo, neon magenta + cyan glow.", swatch: "#160d28", accent: "#ff2e97" },
+  { id: "matrix", label: "Matrix", hint: "Phosphor-green terminal with scanlines.", swatch: "#0a0f0a", accent: "#3df58a" },
+];
+
+export const THEME_IDS = THEMES.map((t) => t.id);
+
 export type AgentPrefs = {
   permissionMode: PermissionMode;
   allowedTools: string[];
   /** "" = default model; otherwise an alias (opus/sonnet/haiku) or full model id. */
   model: string;
+  /** Color theme id (matches a THEMES entry / the html data-theme). */
+  theme: string;
 };
 
 // Default: every tool checked. Because unchecked tools are now *withheld*
@@ -68,6 +82,7 @@ export const DEFAULT_PREFS: AgentPrefs = {
   permissionMode: "acceptEdits",
   allowedTools: [...ALL_TOOLS],
   model: "",
+  theme: "dark",
 };
 
 export function loadPrefs(): AgentPrefs {
@@ -84,7 +99,11 @@ export function loadPrefs(): AgentPrefs {
         ? mode
         : DEFAULT_PREFS.permissionMode;
     const model = typeof parsed.model === "string" ? parsed.model : "";
-    return { permissionMode: validMode, allowedTools: tools, model };
+    const theme =
+      typeof parsed.theme === "string" && THEME_IDS.includes(parsed.theme)
+        ? parsed.theme
+        : DEFAULT_PREFS.theme;
+    return { permissionMode: validMode, allowedTools: tools, model, theme };
   } catch {
     return { ...DEFAULT_PREFS };
   }

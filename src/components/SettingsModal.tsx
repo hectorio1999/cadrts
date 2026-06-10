@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getConfig, setConfig, testRemoteConnection } from "../lib/ipc";
 import type { TransportMode } from "../lib/types";
 import { useStore } from "../lib/store";
-import { ALL_TOOLS, PERMISSION_MODES, MODELS } from "../lib/prefs";
+import { ALL_TOOLS, PERMISSION_MODES, MODELS, THEMES } from "../lib/prefs";
 
 type Mode = "local" | "remote";
 type Probe = { state: "idle" | "running" | "ok" | "err"; message?: string };
@@ -201,6 +201,32 @@ function AgentPrefsSection() {
           Applied to every turn. The permission mode is your main safety control.
         </div>
       </div>
+
+      <Field label="Theme" hint="Color palette for the whole app. Applies instantly.">
+        <div className="flex flex-wrap gap-2">
+          {THEMES.map((t) => {
+            const active = prefs.theme === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setPrefs({ theme: t.id })}
+                title={t.hint}
+                className={`group flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${
+                  active ? "border-accent/70 bg-accent/5 text-zinc-100" : "border-ink-500 text-zinc-400 hover:bg-ink-600/30"
+                }`}
+              >
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full border border-black/20"
+                  style={{ background: t.swatch }}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: t.accent }} />
+                </span>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
 
       <Field label="Model" hint="Applied to every turn. Switch per-task from the composer too.">
         <div className="flex flex-wrap items-center gap-1.5">

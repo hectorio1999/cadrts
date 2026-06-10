@@ -2,6 +2,20 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.0] — 2026-06-10 — "Themes"
+
+### Added
+- **5 color themes** (Settings → Theme, applies instantly, persisted):
+  **Dark** (default), **Light**, **Nord** (arctic blue-gray + frost), **Synthwave**
+  (deep indigo, neon magenta/cyan with a glow), and **Matrix** (phosphor-green
+  terminal with scanlines). The two "designed" themes add subtle pointer-through
+  overlays (neon glow / scanlines). Built on CSS variables so every component
+  re-themes automatically; no flash on load.
+
+### Changed
+- **Chat messages:** your messages are now the only ones with a border — a clean
+  accent-tinted outline (no fill) — while the assistant renders as plain text.
+
 ## [0.8.2] — 2026-06-10
 
 ### Fixed
