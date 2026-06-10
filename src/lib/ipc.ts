@@ -198,32 +198,61 @@ function pathToSkillName(path: string): string {
 }
 
 // ---------- scheduled jobs ----------
-// Jobs live on the agent-server (the scheduler runs there), so these always
-// hit the HTTP API. They're available in Remote mode; in Local mode there's no
-// server scheduler and the calls will fail (the manager shows a friendly note).
+// Jobs live on the agent-server (the scheduler runs there), so these talk to it
+// over HTTP. Unlike most calls, we don't use Tauri commands here — we fetch the
+// server directly using the configured remote base_url (CORS is open + CSP is
+// null, so the desktop webview can reach the LXC). In Local mode there's no
+// server scheduler and `base` resolves to the app origin, so the call fails and
+// the manager shows a friendly "needs Remote mode" note.
+
+async function jobsApi<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const cfg = await getConfig();
+  const t = cfg.transport;
+  const base = t.mode === "remote" ? t.base_url.replace(/\/$/, "") : apiOrigin();
+  const token = t.mode === "remote" ? t.token : getBearerToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${base}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${method} ${path} → ${res.status} ${text}`);
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("application/json")) return res.json() as Promise<T>;
+  return (await res.text()) as unknown as T;
+}
 
 export async function listJobs(): Promise<JobView[]> {
-  return webApi<JobView[]>("GET", "/api/jobs");
+  const r = await jobsApi<JobView[]>("GET", "/api/jobs");
+  // Defensive: a misrouted request (e.g. Local mode hitting the SPA) could
+  // return HTML; never let a non-array reach the UI's .map.
+  if (!Array.isArray(r)) throw new Error("server did not return a job list (are you in Remote mode?)");
+  return r;
 }
 
 export async function createJob(job: CronJob): Promise<CronJob> {
-  return webApi<CronJob>("POST", "/api/jobs", job);
+  return jobsApi<CronJob>("POST", "/api/jobs", job);
 }
 
 export async function updateJob(id: string, patch: Partial<CronJob>): Promise<CronJob> {
-  return webApi<CronJob>("PATCH", `/api/jobs/${encodeURIComponent(id)}`, patch);
+  return jobsApi<CronJob>("PATCH", `/api/jobs/${encodeURIComponent(id)}`, patch);
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  await webApi<unknown>("DELETE", `/api/jobs/${encodeURIComponent(id)}`);
+  await jobsApi<unknown>("DELETE", `/api/jobs/${encodeURIComponent(id)}`);
 }
 
 export async function runJobNow(id: string): Promise<void> {
-  await webApi<unknown>("POST", `/api/jobs/${encodeURIComponent(id)}/run`);
+  await jobsApi<unknown>("POST", `/api/jobs/${encodeURIComponent(id)}/run`);
 }
 
 export async function jobRuns(id: string, limit = 50): Promise<CronRun[]> {
-  return webApi<CronRun[]>("GET", `/api/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`);
+  const r = await jobsApi<CronRun[]>("GET", `/api/jobs/${encodeURIComponent(id)}/runs?limit=${limit}`);
+  return Array.isArray(r) ? r : [];
 }
 
 export async function cancelTurn(turnId: string): Promise<boolean> {

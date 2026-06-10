@@ -2,6 +2,17 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.8.1] — 2026-06-10
+
+### Fixed
+- **Scheduled Jobs panel black-screened in the desktop app.** The jobs calls used
+  the browser-only API helper, which resolves to the webview's own origin in
+  Tauri (`tauri://localhost`) — so `/api/jobs` returned the app's HTML and a
+  non-array crashed the panel on render. Jobs now fetch the configured remote
+  `base_url` directly (CORS is open, CSP null), and the list calls hard-guard
+  against non-array responses so the panel shows a friendly note instead of
+  blanking.
+
 ## [0.8.0] — 2026-06-10 — "Scheduled Automations"
 
 Atlas can now create and run real recurring automations — and proactively
