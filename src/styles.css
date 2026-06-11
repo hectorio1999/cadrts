@@ -71,6 +71,19 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* Mobile browsers: 100% of the *layout* viewport hides the composer behind
+ * Safari/Chrome's collapsing toolbars. dvh tracks the visible viewport. */
+@supports (height: 100dvh) {
+  html, body, #root { height: 100dvh; }
+}
+
+/* Touch niceties: kill the gray tap flash and pull-to-refresh inside the app. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: rgb(var(--ink-900));
@@ -102,6 +115,12 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgb(var(--ink-500)); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink-400)); }
+
+/* iOS Safari zooms the whole page when a focused field is under 16px.
+ * On phones, floor every field at 16px; desktop keeps the compact sizes. */
+@media (max-width: 767px) {
+  input, textarea, select { font-size: 16px !important; }
+}
 
 /* Bare button reset — we style every button in component classes */
 button { background: none; border: none; padding: 0; color: inherit; cursor: pointer; }

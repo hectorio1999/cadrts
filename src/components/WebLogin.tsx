@@ -45,7 +45,7 @@ export default function WebLogin() {
     <div className="h-full grid place-items-center bg-ink-900 text-zinc-200 font-mono">
       <form
         onSubmit={onSubmit}
-        className="w-[440px] p-6 border border-ink-500 rounded-lg bg-ink-800/60"
+        className="w-[440px] max-w-[calc(100vw-2rem)] p-6 border border-ink-500 rounded-lg bg-ink-800/60"
       >
         <div className="flex items-center gap-3 mb-4">
           <div className="w-3 h-3 rounded-full bg-accent" />
@@ -69,7 +69,7 @@ export default function WebLogin() {
           spellCheck={false}
           autoFocus
           placeholder="48+ characters"
-          className="w-full bg-ink-900 border border-ink-500 rounded px-2 py-2 text-sm font-mono mb-3"
+          className="w-full bg-ink-900 border border-ink-500 rounded px-2 py-2 text-base md:text-sm font-mono mb-3"
         />
 
         <button

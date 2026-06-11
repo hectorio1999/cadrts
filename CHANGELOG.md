@@ -2,6 +2,24 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.3] — 2026-06-11 — "Mobile"
+
+### Changed
+- **The web UI is now phone-friendly.** Below the `md` breakpoint:
+  - The session sidebar becomes an off-canvas drawer with a backdrop, opened
+    from a new ☰ top bar in the chat pane; it auto-closes when you pick a
+    session, start a new one, or open any panel. Session delete (✕) is always
+    visible on touch (no hover on phones).
+  - The inspector opens full-screen with its own ✕ close button.
+  - The status bar hides the turn/cost readout and truncates instead of
+    wrapping; the composer meta strip (Mode/Model/skill) wraps cleanly.
+  - Login cards, toasts, and the composer fit the viewport (safe-area aware).
+- **iOS fixes:** fields are floored at 16px on phones so Safari no longer
+  zooms the page when you tap the composer; the app uses `100dvh` so the
+  input is never hidden behind Safari's collapsing toolbar; tap highlight
+  and pull-to-refresh are disabled inside the app.
+- Desktop layout is unchanged (all of the above is gated to small screens).
+
 ## [0.9.2] — 2026-06-10
 
 ### Changed

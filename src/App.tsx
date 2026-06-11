@@ -32,6 +32,8 @@ export default function App() {
   const [jobsOpen, setJobsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Mobile-only: the sidebar is an off-canvas drawer below the md breakpoint.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Global Cmd/Ctrl+K
   useEffect(() => {
@@ -133,13 +135,21 @@ export default function App() {
   return (
     <div className="h-full flex flex-col bg-ink-900 text-zinc-200">
       <div className="flex-1 min-h-0 flex">
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-ink-900/70 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         <SessionSidebar
-          onOpenMemory={() => setMemoryOpen(true)}
-          onOpenSkills={() => setSkillsOpen(true)}
-          onOpenJobs={() => setJobsOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onOpenMemory={() => { setSidebarOpen(false); setMemoryOpen(true); }}
+          onOpenSkills={() => { setSidebarOpen(false); setSkillsOpen(true); }}
+          onOpenJobs={() => { setSidebarOpen(false); setJobsOpen(true); }}
+          onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
         />
-        <ChatPane />
+        <ChatPane onOpenSidebar={() => setSidebarOpen(true)} />
         {inspectorOpen && <InspectorPane />}
       </div>
       <StatusBar />

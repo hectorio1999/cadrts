@@ -59,7 +59,7 @@ export default function AuthGate() {
 
   return (
     <div className="h-full grid place-items-center bg-ink-900 text-zinc-200 font-mono">
-      <div className="w-[420px] p-6 border border-ink-500 rounded-lg bg-ink-800/60">
+      <div className="w-[420px] max-w-[calc(100vw-2rem)] p-6 border border-ink-500 rounded-lg bg-ink-800/60">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-3 h-3 rounded-full bg-accent" />
           <div className="text-lg font-semibold">Claude Agent Desktop</div>

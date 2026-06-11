@@ -10,6 +10,7 @@ export default function InspectorPane() {
   const selectedId = useStore((s) => s.selectedToolRunId);
   const session = useStore((s) => s.session);
   const lastOutcome = useStore((s) => s.lastOutcome);
+  const toggleInspector = useStore((s) => s.toggleInspector);
 
   const run = (() => {
     if (!selectedId) return null;
@@ -21,9 +22,16 @@ export default function InspectorPane() {
   })();
 
   return (
-    <aside className="w-[360px] border-l border-ink-600 bg-ink-800/40 flex flex-col text-xs font-mono">
-      <div className="px-3 py-2 border-b border-ink-600 text-zinc-300 font-semibold uppercase tracking-wider text-[10px]">
-        inspector
+    <aside className="fixed inset-0 z-40 w-full bg-ink-900 md:static md:z-auto md:w-[360px] md:bg-ink-800/40 border-l border-ink-600 flex flex-col text-xs font-mono">
+      <div className="px-3 py-2 border-b border-ink-600 text-zinc-300 font-semibold uppercase tracking-wider text-[10px] flex items-center justify-between">
+        <span>inspector</span>
+        <button
+          onClick={toggleInspector}
+          title="Close inspector"
+          className="rounded border border-ink-500 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-ink-600/40 md:hidden"
+        >
+          ✕ close
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">

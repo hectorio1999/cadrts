@@ -10,7 +10,7 @@ import WorkspaceBar from "./WorkspaceBar";
 import SkillLibrary from "./SkillLibrary";
 import LiveActivity from "./LiveActivity";
 
-export default function ChatPane() {
+export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const messages = useStore((s) => s.messages);
   const streaming = useStore((s) => s.streaming);
   const setStreaming = useStore((s) => s.setStreaming);
@@ -112,11 +112,26 @@ export default function ChatPane() {
 
   return (
     <main className="relative flex-1 min-w-0 flex flex-col bg-ink-900">
+      {/* Mobile-only top bar: the sidebar is a drawer below md, so this is the
+          way in. Hidden on desktop where the rail is always visible. */}
+      <div className="flex items-center gap-2 border-b border-ink-600 bg-ink-800/40 px-3 py-2 md:hidden">
+        <button
+          onClick={onOpenSidebar}
+          title="Open sessions"
+          className="rounded border border-ink-500 px-2.5 py-1 text-sm text-zinc-300 hover:bg-ink-600/40"
+        >
+          ☰
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-accent" />
+          <span className="text-sm font-semibold">Agent Desktop</span>
+        </div>
+      </div>
       <WorkspaceBar />
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-3"
+        className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-4 space-y-3"
       >
         {messages.length === 0 ? (
           <Empty />
@@ -136,7 +151,7 @@ export default function ChatPane() {
         </button>
       )}
 
-      <div className="border-t border-ink-600 bg-ink-800/40 px-4 py-3">
+      <div className="border-t border-ink-600 bg-ink-800/40 px-3 py-2 md:px-4 md:py-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-3">
         {/* Thin meta strip — only shown when we have an upstream session.
             Lets the user reset the conversation thread server-side without
             wiping the visible history. handleEnvelope also auto-fires this
@@ -155,7 +170,7 @@ export default function ChatPane() {
             </button>
           </div>
         )}
-        <div className="relative mb-2 flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+        <div className="relative mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-mono text-zinc-500">
           <span className="uppercase tracking-wide">Mode</span>
           <PermissionModeSelect
             value={prefs.permissionMode}
@@ -204,7 +219,7 @@ export default function ChatPane() {
               streaming ? "agent is working — Stop or wait…" : "Tell the agent what to do.   Enter to send, Shift+Enter for newline."
             }
             disabled={streaming}
-            className="flex-1 resize-none bg-ink-700/40 border border-ink-500 rounded px-3 py-2 text-sm text-zinc-100 font-mono leading-relaxed placeholder:text-zinc-600 focus:border-accent/60"
+            className="flex-1 resize-none bg-ink-700/40 border border-ink-500 rounded px-3 py-2 text-base md:text-sm text-zinc-100 font-mono leading-relaxed placeholder:text-zinc-600 focus:border-accent/60"
             rows={1}
           />
           {streaming ? (

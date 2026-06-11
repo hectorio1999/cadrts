@@ -7,13 +7,20 @@ import { useStore } from "../lib/store";
  *   1. New / refresh actions
  *   2. SQLite-backed session history (click to resume, dbl-click to rename)
  *   3. Memory + skills entry points
+ *
+ * Below the md breakpoint it renders as an off-canvas drawer (`open`/`onClose`
+ * driven from App); from md up it's the always-visible static rail.
  */
 export default function SessionSidebar({
+  open,
+  onClose,
   onOpenMemory,
   onOpenSkills,
   onOpenJobs,
   onOpenSettings,
 }: {
+  open: boolean;
+  onClose: () => void;
   onOpenMemory: () => void;
   onOpenSkills: () => void;
   onOpenJobs: () => void;
@@ -32,20 +39,36 @@ export default function SessionSidebar({
   }, [refreshSessions]);
 
   return (
-    <aside className="w-64 border-r border-ink-600 bg-ink-800/40 flex flex-col">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 w-72 max-w-[85vw] transform transition-transform duration-200 ease-out bg-ink-800 border-r border-ink-600 flex flex-col ${
+        open ? "translate-x-0" : "-translate-x-full"
+      } md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 md:transition-none md:bg-ink-800/40`}
+    >
       <div className="p-3 border-b border-ink-600 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-accent" />
           <span className="font-semibold text-sm">Agent Desktop</span>
         </div>
-        <button
-          onClick={resetSession}
-          disabled={streaming}
-          title="Start a new conversation"
-          className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40"
-        >
-          + new
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              resetSession();
+              onClose();
+            }}
+            disabled={streaming}
+            title="Start a new conversation"
+            className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40"
+          >
+            + new
+          </button>
+          <button
+            onClick={onClose}
+            title="Close sidebar"
+            className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40 md:hidden"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-zinc-500 flex items-center justify-between">
@@ -70,7 +93,10 @@ export default function SessionSidebar({
               row={row}
               isActive={row.id === session.id}
               disabled={streaming}
-              onOpen={() => openSession(row.id)}
+              onOpen={() => {
+                openSession(row.id);
+                onClose(); // collapse the mobile drawer; no-op visually on desktop
+              }}
               onAfterMutate={() => refreshSessions()}
             />
           ))
@@ -164,7 +190,7 @@ function SessionRowItem(props: {
         )}
         <button
           onClick={onDelete}
-          className="opacity-0 group-hover:opacity-60 hover:opacity-100 ml-2 text-zinc-500 hover:text-red-400"
+          className="opacity-60 md:opacity-0 md:group-hover:opacity-60 hover:opacity-100 ml-2 text-zinc-500 hover:text-red-400"
           title="Delete"
         >
           ✕
