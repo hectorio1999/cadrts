@@ -72,6 +72,11 @@ STATUS=$(sudo -u "$USER_NAME" XDG_RUNTIME_DIR="/run/user/$(id -u "$USER_NAME")" 
 ok "service: $STATUS"
 
 step "Verifying /api/version"
-curl -fsS http://127.0.0.1:9120/api/version | sed 's/,/,\n  /g'
+# The server may be bound to a specific interface (LAN-only mode), in which
+# case 127.0.0.1 won't answer. Probe whatever CAD_SERVER_BIND says.
+BIND=$(grep -oP '^CAD_SERVER_BIND=\K.*' /etc/cad/server.env || true)
+BIND=${BIND:-127.0.0.1:9120}
+BIND=${BIND/0.0.0.0/127.0.0.1}
+curl -fsS "http://$BIND/api/version" | sed 's/,/,\n  /g'
 echo
 ok "deploy complete · HEAD=$AFTER"
