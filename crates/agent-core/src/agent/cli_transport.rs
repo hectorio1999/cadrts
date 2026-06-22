@@ -23,6 +23,7 @@ use super::{AgentTransport, PermissionMode, TurnHandle, TurnOutcome, TurnRequest
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
@@ -304,6 +305,21 @@ async fn drive(
     let mut last_text: Option<String> = None;
     let mut final_event: Option<ResultEvent> = None;
 
+    // Per-turn budget guard (env-tunable; 0 = disabled). Stops a runaway or
+    // looping turn so a confused Opus turn cannot burn unbounded time/cost. On
+    // trip we kill the child and end the turn cleanly — the next user message
+    // resumes the session normally (no mid-turn nag injected).
+    let max_secs: u64 = std::env::var("ATLAS_TURN_MAX_SECS")
+        .ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let max_tools: u64 = std::env::var("ATLAS_TURN_MAX_TOOLS")
+        .ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let mut tool_count: u64 = 0;
+    let deadline = tokio::time::Instant::now()
+        + if max_secs > 0 { Duration::from_secs(max_secs) }
+          else { Duration::from_secs(60 * 60 * 24 * 365) };
+    let sleep = tokio::time::sleep_until(deadline);
+    tokio::pin!(sleep);
+
     loop {
         tokio::select! {
             biased;
@@ -315,6 +331,19 @@ async fn drive(
                     session_id: session_id.unwrap_or_default(),
                     is_error: true,
                     terminal_reason: Some("cancelled".into()),
+                    total_cost_usd: None,
+                    final_text: last_text,
+                    num_turns: None,
+                });
+            }
+            _ = &mut sleep, if max_secs > 0 => {
+                warn!(max_secs, "turn hit wall-clock budget cap — killing claude child");
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+                return Ok(TurnOutcome {
+                    session_id: session_id.unwrap_or_default(),
+                    is_error: true,
+                    terminal_reason: Some(format!("budget: hit {max_secs}s wall-clock cap")),
                     total_cost_usd: None,
                     final_text: last_text,
                     num_turns: None,
@@ -335,13 +364,20 @@ async fn drive(
                         if let AgentEvent::System(SystemEvent { session_id: Some(s), .. }) = &ev {
                             session_id = Some(s.clone());
                         }
-                        // Track the last assistant text so we can return it on cancel.
+                        // Track the last assistant text (for cancel/return) and
+                        // count tool_use blocks toward the per-turn budget cap.
                         if let AgentEvent::Assistant(a) = &ev {
                             if let Some(m) = &a.message {
                                 if let Some(content) = &m.content {
                                     for blk in content {
-                                        if let super::events::ContentBlock::Text { text } = blk {
-                                            last_text = Some(text.clone());
+                                        match blk {
+                                            super::events::ContentBlock::Text { text } => {
+                                                last_text = Some(text.clone());
+                                            }
+                                            super::events::ContentBlock::ToolUse { .. } => {
+                                                tool_count += 1;
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -351,6 +387,20 @@ async fn drive(
                             final_event = Some(r.clone());
                         }
                         let _ = events.send(ev);
+
+                        if max_tools > 0 && tool_count > max_tools {
+                            warn!(tool_count, max_tools, "turn hit tool-call budget cap — killing claude child");
+                            let _ = child.start_kill();
+                            let _ = child.wait().await;
+                            return Ok(TurnOutcome {
+                                session_id: session_id.clone().unwrap_or_default(),
+                                is_error: true,
+                                terminal_reason: Some(format!("budget: hit {max_tools}-tool cap")),
+                                total_cost_usd: None,
+                                final_text: last_text.clone(),
+                                num_turns: None,
+                            });
+                        }
                     }
                     Ok(None) => break,
                     Err(e) => {
