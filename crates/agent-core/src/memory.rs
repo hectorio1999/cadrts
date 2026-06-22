@@ -123,11 +123,21 @@ pub fn list_skills() -> Result<Vec<Skill>> {
                 when: None,
                 trigger: None,
             });
+        // Name precedence: frontmatter `name` > directory name for a bundle
+        // (`<name>/SKILL.md`, the agentskills.io / Skills-Hub layout) > file stem.
+        // The bundle case matters: without it every `SKILL.md` would default to
+        // the stem "SKILL" and collide in the map.
         let name = fm.name.unwrap_or_else(|| {
-            p.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unnamed")
-                .to_string()
+            let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed");
+            if stem.eq_ignore_ascii_case("skill") {
+                p.parent()
+                    .and_then(|d| d.file_name())
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(stem)
+                    .to_string()
+            } else {
+                stem.to_string()
+            }
         });
         out.insert(
             name.clone(),
