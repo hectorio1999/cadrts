@@ -2,6 +2,23 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.4] — 2026-06-25 — "Navy"
+
+### Changed
+- **New default look — a deep-navy theme inspired by Hermes Desktop.** Royal-navy
+  surfaces with a warm cream/gold accent. The other five themes (Dark, Light,
+  Nord, Synthwave, Matrix) are still available in Settings; existing installs keep
+  their saved theme — switch to **Navy** in Settings to opt in.
+- **The empty state is now a large cream serif ATLAS wordmark** with a subtitle,
+  using a system serif (no external font fetch).
+- **Sidebar restructured** into labelled sections: nav items (New session, Skills
+  & Tools, Memory, Settings), a session search box, a **Sessions** section with a
+  live count, and a **Cron Jobs** section wired to `/api/jobs` with per-job
+  next-run countdowns.
+- **The composer is now a rounded pill** — a `+` button opens the skill library,
+  with a circular send / stop control.
+- The status bar switches from monospace to sans to match.
+
 ## [0.9.3] — 2026-06-11 — "Mobile"
 
 ### Changed
