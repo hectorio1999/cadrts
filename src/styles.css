@@ -8,6 +8,7 @@
  * Tailwind's `/<alpha>` opacity modifiers keep working). The tokens map to the
  * app's existing classes: ink-900..400 (surfaces/borders), accent, and the
  * zinc-100..900 text ramp (100 = most prominent → 700 = faintest).
+ *  - navy     : deep royal navy + cream serif wordmark (Hermes-style, default)
  *  - dark    : the original tactical dark + orange
  *  - light   : clean light mode
  *  - nord     : arctic blue-gray, frost accent
@@ -15,7 +16,19 @@
  *  - matrix   : near-black phosphor-green terminal, scanline design
  * ========================================================================= */
 
+/* Navy is the default look: a deep royal-navy field with a warm cream/gold
+ * accent — the wordmark, CTAs and highlights read as parchment on midnight. */
 :root,
+[data-theme="navy"] {
+  --ink-900: 9 19 44;    --ink-800: 13 26 58;   --ink-700: 19 37 76;
+  --ink-600: 29 51 100;  --ink-500: 42 68 126;  --ink-400: 62 92 158;
+  --accent: 230 214 176; --accent-dim: 178 161 121;
+  --tx-100: 245 246 251; --tx-200: 223 229 242; --tx-300: 198 209 230;
+  --tx-400: 157 173 204; --tx-500: 119 137 174; --tx-600: 91 108 145;
+  --tx-700: 68 85 120;   --tx-800: 38 55 94;    --tx-900: 22 35 66;
+  --md-heading: 232 224 198; --md-strong: 245 246 251;
+}
+
 [data-theme="dark"] {
   --ink-900: 11 13 16;   --ink-800: 17 20 26;   --ink-700: 23 27 34;
   --ink-600: 31 36 45;   --ink-500: 42 49 60;   --ink-400: 58 66 80;
@@ -82,6 +95,10 @@ html {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
+  /* High-contrast classic serif for the wordmark — all system fonts, no
+   * external fetch (this client runs LAN-only). */
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Palatino", "Book Antiqua",
+    Georgia, Cambria, "Times New Roman", serif;
 }
 
 body {
@@ -108,6 +125,19 @@ body {
 [data-theme="nord"] body::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
   background: radial-gradient(80% 45% at 50% 0%, rgba(136, 192, 208, 0.07), transparent 70%);
+}
+[data-theme="navy"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background:
+    radial-gradient(70% 50% at 50% -10%, rgba(120, 150, 220, 0.10), transparent 70%),
+    radial-gradient(50% 40% at 50% 110%, rgba(230, 214, 176, 0.05), transparent 70%);
+}
+
+/* The big serif wordmark in the empty state (Atlas) and other display text. */
+.wordmark {
+  font-family: var(--font-serif);
+  letter-spacing: 0.14em;
+  font-weight: 500;
 }
 
 /* Custom scrollbar */

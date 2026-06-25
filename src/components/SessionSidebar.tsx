@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { deleteSession as ipcDelete, renameSession as ipcRename } from "../lib/ipc";
+import { deleteSession as ipcDelete, renameSession as ipcRename, listJobs } from "../lib/ipc";
 import { useStore } from "../lib/store";
+import type { JobView } from "../lib/types";
 
 /**
- * Three-zone left rail:
- *   1. New / refresh actions
- *   2. SQLite-backed session history (click to resume, dbl-click to rename)
- *   3. Memory + skills entry points
+ * Hermes-style left rail:
+ *   1. ATLAS wordmark + new/close
+ *   2. Nav items (new session, skills, memory, settings)
+ *   3. Session search
+ *   4. SESSIONS — SQLite-backed history with a count (click to resume, dbl-click to rename)
+ *   5. CRON JOBS — server-side scheduled jobs with a count + next-run countdown
  *
  * Below the md breakpoint it renders as an off-canvas drawer (`open`/`onClose`
  * driven from App); from md up it's the always-visible static rail.
@@ -33,10 +36,34 @@ export default function SessionSidebar({
   const refreshSessions = useStore((s) => s.refreshSessions);
   const openSession = useStore((s) => s.openSession);
 
-  // Pull the list whenever this component mounts.
+  const [query, setQuery] = useState("");
+  const [jobs, setJobs] = useState<JobView[]>([]);
+
+  // Pull the session list whenever this component mounts.
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
+
+  // Cron jobs live server-side (Remote mode). Best-effort: in Local mode the
+  // call throws and we just leave the section showing a 0 count.
+  useEffect(() => {
+    let alive = true;
+    listJobs()
+      .then((j) => alive && setJobs(j))
+      .catch(() => alive && setJobs([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? sessionList.filter((r) => r.title.toLowerCase().includes(q))
+    : sessionList;
+
+  const sortedJobs = [...jobs].sort(
+    (a, b) => (a.next_run ?? Infinity) - (b.next_run ?? Infinity),
+  );
 
   return (
     <aside
@@ -44,35 +71,49 @@ export default function SessionSidebar({
         open ? "translate-x-0" : "-translate-x-full"
       } md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 md:transition-none md:bg-ink-800/40`}
     >
+      {/* Wordmark header */}
       <div className="p-3 border-b border-ink-600 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-accent" />
-          <span className="font-semibold text-sm">Agent Desktop</span>
+          <span className="wordmark text-accent text-sm">ATLAS</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              resetSession();
-              onClose();
-            }}
-            disabled={streaming}
-            title="Start a new conversation"
-            className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40"
-          >
-            + new
-          </button>
-          <button
-            onClick={onClose}
-            title="Close sidebar"
-            className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40 md:hidden"
-          >
-            ✕
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          title="Close sidebar"
+          className="px-2 py-1 text-xs rounded border border-ink-500 hover:bg-ink-600/40 md:hidden"
+        >
+          ✕
+        </button>
       </div>
 
-      <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider text-zinc-500 flex items-center justify-between">
-        <span>history</span>
+      {/* Nav items */}
+      <div className="p-2 flex flex-col gap-0.5 border-b border-ink-600">
+        <NavItem
+          icon="＋"
+          label="New session"
+          disabled={streaming}
+          onClick={() => {
+            resetSession();
+            onClose();
+          }}
+        />
+        <NavItem icon="⚒" label="Skills & Tools" onClick={onOpenSkills} />
+        <NavItem icon="❖" label="Memory" onClick={onOpenMemory} />
+        <NavItem icon="⚙" label="Settings" onClick={onOpenSettings} />
+      </div>
+
+      {/* Session search */}
+      <div className="px-3 pt-3 pb-1">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search sessions…"
+          className="w-full bg-ink-700/40 border border-ink-600 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-accent/50"
+        />
+      </div>
+
+      {/* SESSIONS section */}
+      <SectionHeader label="Sessions" count={filtered.length}>
         <button
           onClick={() => refreshSessions()}
           className="text-zinc-500 hover:text-zinc-300"
@@ -80,14 +121,14 @@ export default function SessionSidebar({
         >
           ↻
         </button>
-      </div>
+      </SectionHeader>
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {sessionList.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="px-2 py-3 text-xs text-zinc-500 italic">
-            No past sessions yet. They appear here after the first turn finishes.
+            {q ? "No sessions match." : "No past sessions yet. They appear here after the first turn finishes."}
           </div>
         ) : (
-          sessionList.map((row) => (
+          filtered.map((row) => (
             <SessionRowItem
               key={row.id}
               row={row}
@@ -103,33 +144,96 @@ export default function SessionSidebar({
         )}
       </div>
 
-      <div className="p-3 border-t border-ink-600 flex flex-col gap-1">
-        <button
-          onClick={onOpenMemory}
-          className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
-        >
-          ⌘  edit memory
-        </button>
-        <button
-          onClick={onOpenSkills}
-          className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
-        >
-          ⌥  manage skills
-        </button>
-        <button
-          onClick={onOpenJobs}
-          className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
-        >
-          ⏰  scheduled jobs
-        </button>
-        <button
-          onClick={onOpenSettings}
-          className="text-xs text-left px-2 py-1.5 rounded hover:bg-ink-600/40"
-        >
-          ⚙  settings (transport)
-        </button>
+      {/* CRON JOBS section */}
+      <div className="border-t border-ink-600">
+        <SectionHeader label="Cron Jobs" count={jobs.length}>
+          <button
+            onClick={onOpenJobs}
+            className="text-zinc-500 hover:text-zinc-300"
+            title="Manage scheduled jobs"
+          >
+            ⚙
+          </button>
+        </SectionHeader>
+        <div className="max-h-44 overflow-y-auto px-2 pb-2">
+          {sortedJobs.length === 0 ? (
+            <button
+              onClick={onOpenJobs}
+              className="w-full px-2 py-2 text-left text-[11px] text-zinc-500 italic hover:text-zinc-300"
+            >
+              None scheduled — open the manager…
+            </button>
+          ) : (
+            sortedJobs.map((j) => (
+              <JobRowItem key={j.id} job={j} onClick={onOpenJobs} />
+            ))
+          )}
+        </div>
       </div>
     </aside>
+  );
+}
+
+function NavItem({
+  icon,
+  label,
+  shortcut,
+  disabled,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  shortcut?: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm text-zinc-300 hover:bg-ink-600/40 disabled:opacity-40"
+    >
+      <span className="w-4 text-center text-zinc-400 group-hover:text-accent">{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {shortcut && <span className="text-[10px] text-zinc-600">{shortcut}</span>}
+    </button>
+  );
+}
+
+function SectionHeader({
+  label,
+  count,
+  children,
+}: {
+  label: string;
+  count: number;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="px-3 pt-3 pb-1 flex items-center justify-between">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-zinc-500">
+        <span>{label}</span>
+        <span className="text-zinc-600">{count}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function JobRowItem({ job, onClick }: { job: JobView; onClick: () => void }) {
+  const when = job.next_run != null ? untilTime(job.next_run) : job.schedule_human;
+  return (
+    <button
+      onClick={onClick}
+      title={`${job.name} · ${job.schedule_human}${job.enabled ? "" : " · paused"}`}
+      className="group w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-ink-600/30"
+    >
+      <span
+        className={`flex-none w-1.5 h-1.5 rounded-full ${job.enabled ? "bg-accent/70" : "bg-zinc-600"}`}
+      />
+      <span className="flex-1 min-w-0 truncate text-left text-zinc-300">{job.name}</span>
+      <span className="flex-none text-[10px] text-zinc-500">{when}</span>
+    </button>
   );
 }
 
@@ -163,7 +267,7 @@ function SessionRowItem(props: {
     <div
       onClick={() => !disabled && !editing && onOpen()}
       onDoubleClick={() => setEditing(true)}
-      className={`group px-2 py-2 rounded mb-1 cursor-pointer text-xs font-mono ${
+      className={`group px-2 py-2 rounded mb-1 cursor-pointer text-xs ${
         isActive
           ? "bg-accent/10 border border-accent/40"
           : "border border-transparent hover:bg-ink-600/30"
@@ -209,4 +313,15 @@ function timeAgo(ts: number): string {
   if (d < 3600) return `${Math.floor(d / 60)}m`;
   if (d < 86400) return `${Math.floor(d / 3600)}h`;
   return `${Math.floor(d / 86400)}d`;
+}
+
+// Countdown to a job's next run. Tolerates epoch-seconds or -milliseconds.
+function untilTime(ts: number): string {
+  const ms = ts < 1e12 ? ts * 1000 : ts;
+  const d = (ms - Date.now()) / 1000;
+  if (d <= 0) return "due";
+  if (d < 60) return `in ${Math.round(d)}s`;
+  if (d < 3600) return `in ${Math.round(d / 60)}m`;
+  if (d < 86400) return `in ${Math.round(d / 3600)}h`;
+  return `in ${Math.round(d / 86400)}d`;
 }

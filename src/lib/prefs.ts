@@ -57,7 +57,8 @@ export const MODELS: { value: string; label: string; hint: string }[] = [
 /** Color themes. `id` matches the `data-theme` attribute set on <html>.
  *  `swatch`/`accent` drive the little preview chips in Settings. */
 export const THEMES: { id: string; label: string; hint: string; swatch: string; accent: string }[] = [
-  { id: "dark", label: "Dark", hint: "Tactical dark + orange (default).", swatch: "#0b0d10", accent: "#ff7a59" },
+  { id: "navy", label: "Navy", hint: "Deep royal navy + cream serif wordmark (default).", swatch: "#09132c", accent: "#e6d6b0" },
+  { id: "dark", label: "Dark", hint: "Tactical dark + orange.", swatch: "#0b0d10", accent: "#ff7a59" },
   { id: "light", label: "Light", hint: "Clean light mode.", swatch: "#f7f7f8", accent: "#e35a36" },
   { id: "nord", label: "Nord", hint: "Arctic blue-gray with a frost accent.", swatch: "#2e3440", accent: "#88c0d0" },
   { id: "synthwave", label: "Synthwave", hint: "Deep indigo, neon magenta + cyan glow.", swatch: "#160d28", accent: "#ff2e97" },
@@ -82,7 +83,7 @@ export const DEFAULT_PREFS: AgentPrefs = {
   permissionMode: "acceptEdits",
   allowedTools: [...ALL_TOOLS],
   model: "",
-  theme: "dark",
+  theme: "navy",
 };
 
 export function loadPrefs(): AgentPrefs {

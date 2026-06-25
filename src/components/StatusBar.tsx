@@ -9,7 +9,7 @@ export default function StatusBar() {
   const lastOutcome = useStore((s) => s.lastOutcome);
 
   return (
-    <footer className="h-7 px-3 border-t border-ink-600 bg-ink-800/60 text-[11px] font-mono text-zinc-400 flex items-center gap-3 md:gap-4 overflow-hidden whitespace-nowrap">
+    <footer className="h-7 px-3 border-t border-ink-600 bg-ink-800/60 text-[11px] text-zinc-400 flex items-center gap-3 md:gap-4 overflow-hidden whitespace-nowrap">
       <div className="flex items-center gap-1.5 min-w-0">
         <span
           className={`flex-none w-1.5 h-1.5 rounded-full ${

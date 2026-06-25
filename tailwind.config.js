@@ -13,6 +13,7 @@ export default {
     extend: {
       fontFamily: {
         mono: ['"JetBrains Mono"', '"Fira Code"', "Menlo", "Consolas", "monospace"],
+        serif: ["var(--font-serif)"],
       },
       colors: {
         ink: {

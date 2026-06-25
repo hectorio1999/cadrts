@@ -124,7 +124,7 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
         </button>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-accent" />
-          <span className="text-sm font-semibold">Agent Desktop</span>
+          <span className="wordmark text-sm text-accent">ATLAS</span>
         </div>
       </div>
       <WorkspaceBar />
@@ -178,13 +178,6 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
           />
           <span className="uppercase tracking-wide">Model</span>
           <ModelSelect value={prefs.model} onChange={(m) => setPrefs({ model: m })} />
-          <button
-            onClick={() => setSkillLibraryOpen(true)}
-            className="rounded border border-ink-500 px-1.5 py-0.5 text-zinc-300 hover:bg-ink-600/40"
-            title="Browse the skill library"
-          >
-            ⚡ skill
-          </button>
           {pendingSkill && (
             <span className="inline-flex items-center gap-1 rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 text-accent">
               {pendingSkill.name}
@@ -204,7 +197,15 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
             <span className="text-amber-400/80">⚠ no confirmation gating</span>
           )}
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1.5 rounded-2xl border border-ink-600 bg-ink-700/30 pl-1.5 pr-1.5 py-1.5 transition-colors focus-within:border-accent/50">
+          <button
+            onClick={() => setSkillLibraryOpen(true)}
+            disabled={streaming}
+            title="Browse the skill library"
+            className="flex-none w-9 h-9 grid place-items-center rounded-full text-lg text-zinc-400 hover:bg-ink-600/50 hover:text-zinc-200 disabled:opacity-40"
+          >
+            +
+          </button>
           <textarea
             ref={taRef}
             value={input}
@@ -216,26 +217,28 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
               }
             }}
             placeholder={
-              streaming ? "agent is working — Stop or wait…" : "Tell the agent what to do.   Enter to send, Shift+Enter for newline."
+              streaming ? "Atlas is working — Stop or wait…" : "Give Atlas a task…"
             }
             disabled={streaming}
-            className="flex-1 resize-none bg-ink-700/40 border border-ink-500 rounded px-3 py-2 text-base md:text-sm text-zinc-100 font-mono leading-relaxed placeholder:text-zinc-600 focus:border-accent/60"
+            className="flex-1 resize-none bg-transparent px-1.5 py-1.5 text-base md:text-sm text-zinc-100 leading-relaxed placeholder:text-zinc-500"
             rows={1}
           />
           {streaming ? (
             <button
               onClick={onStop}
-              className="px-4 py-2 rounded border border-red-500/60 text-red-300 hover:bg-red-500/10 text-sm font-mono"
+              title="Stop the current turn"
+              className="flex-none w-9 h-9 grid place-items-center rounded-full border border-red-500/60 text-red-300 hover:bg-red-500/10"
             >
-              ⛔ stop
+              ■
             </button>
           ) : (
             <button
               onClick={onSubmit}
               disabled={!input.trim()}
-              className="px-4 py-2 rounded bg-accent text-ink-900 font-semibold disabled:opacity-40 text-sm"
+              title="Send (Enter)"
+              className="flex-none w-9 h-9 grid place-items-center rounded-full bg-accent text-ink-900 font-semibold disabled:opacity-30 transition-opacity"
             >
-              send
+              ↑
             </button>
           )}
         </div>
@@ -314,25 +317,28 @@ function ModelSelect({ value, onChange }: { value: string; onChange: (m: string)
 function Empty() {
   const workspace = useStore((s) => s.workspace);
   return (
-    <div className="h-full grid place-items-center text-zinc-500 text-sm font-mono">
-      <div className="max-w-md text-center">
-        <div className="mb-2 font-semibold text-zinc-300">Ready.</div>
-        {workspace ? (
-          <div className="text-xs leading-relaxed">
-            Working in <span className="text-accent">{workspace}</span>.<br />
-            Try <span className="text-accent">"summarize this project"</span>, or attach the{" "}
-            <span className="text-accent">Project Onboarding</span> workflow with <span className="text-zinc-400">⚡ skill</span>.
-          </div>
-        ) : (
-          <div className="text-xs leading-relaxed">
-            Pick a <span className="text-accent">Project</span> above to work in a codebase — or just ask.
-            <br />
-            Try <span className="text-accent">"list the files here"</span> or attach a{" "}
-            <span className="text-zinc-400">⚡ skill</span> workflow.
-          </div>
-        )}
-        <div className="mt-3 text-[10px] text-zinc-600">
-          ⌘K command palette · ⚡ workflow skills · Mode controls what the agent may do
+    <div className="h-full grid place-items-center px-4 text-center">
+      <div className="max-w-xl">
+        <div className="wordmark select-none text-accent text-5xl md:text-7xl leading-none">
+          ATLAS
+        </div>
+        <div className="mt-4 text-sm md:text-base text-zinc-400">
+          Send the problem, file, or idea. I'll follow the personality you've configured.
+        </div>
+        <div className="mt-5 text-xs leading-relaxed text-zinc-500">
+          {workspace ? (
+            <>
+              Working in <span className="text-accent">{workspace}</span> — try{" "}
+              <span className="text-zinc-300">"summarize this project"</span>.
+            </>
+          ) : (
+            <>
+              Pick a <span className="text-accent">Project</span> above to work in a codebase — or just ask.
+            </>
+          )}
+        </div>
+        <div className="mt-2 text-[10px] text-zinc-600">
+          ⌘K command palette · + workflow skills · Mode controls what the agent may do
         </div>
       </div>
     </div>
