@@ -127,7 +127,6 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
           <span className="wordmark text-sm text-accent">ATLAS</span>
         </div>
       </div>
-      <WorkspaceBar />
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -178,6 +177,8 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
           />
           <span className="uppercase tracking-wide">Model</span>
           <ModelSelect value={prefs.model} onChange={(m) => setPrefs({ model: m })} />
+          <span className="uppercase tracking-wide">Project</span>
+          <WorkspaceBar />
           {pendingSkill && (
             <span className="inline-flex items-center gap-1 rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 text-accent">
               {pendingSkill.name}

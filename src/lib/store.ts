@@ -167,7 +167,7 @@ export const useStore = create<State>((set, get) => ({
   streaming: false,
   lastOutcome: null,
 
-  inspectorOpen: true,
+  inspectorOpen: false,
   toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
   selectedToolRunId: null,
   selectToolRun: (id) => set({ selectedToolRunId: id }),

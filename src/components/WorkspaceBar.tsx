@@ -1,12 +1,15 @@
-// Thin bar above the chat showing the active project root (the `cwd` sent to
-// the agent each turn) with controls to switch it. This is what makes the app
-// "understand the current project" instead of running in a bare HOME.
+// Compact project-root control. Lives inline in the composer meta strip next to
+// Mode/Model and sets the `cwd` sent to the agent each turn. This is what makes
+// the app "understand the current project" instead of running in a bare HOME.
 //
 // Two ways to set the workspace, surfaced honestly:
 //   - "Browse…" (desktop app only) opens the native folder picker — best for
 //     Local transport where the agent runs on this machine.
 //   - A text field accepts a typed/pasted path — required for Remote transport,
 //     where `cwd` is a path on the server's filesystem the picker can't see.
+//
+// The popover opens UPWARD (bottom-full) because this control sits at the
+// bottom of the window in the composer strip.
 
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../lib/store";
@@ -53,25 +56,21 @@ export default function WorkspaceBar() {
   const label = workspace ? basename(workspace) : "No project";
 
   return (
-    <div ref={popRef} className="relative border-b border-ink-600 bg-ink-800/40">
+    <div ref={popRef} className="relative inline-flex items-center">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-ink-700/30"
         title={workspace ?? "Agent runs in its default home directory"}
+        className={`flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-[10px] font-mono hover:bg-ink-600/40 ${
+          workspace ? "border-accent/40 text-accent" : "border-ink-500 text-zinc-200"
+        }`}
       >
-        <span className="text-zinc-500" aria-hidden>
-          {workspace ? "📁" : "🏠"}
-        </span>
-        <span className="text-[10px] uppercase tracking-wide text-zinc-600">Project</span>
-        <span className="truncate text-sm font-mono text-zinc-200">{label}</span>
-        {workspace && (
-          <span className="truncate text-[10px] font-mono text-zinc-600">{workspace}</span>
-        )}
-        <span className="ml-auto text-zinc-600">{open ? "▴" : "▾"}</span>
+        <span aria-hidden>{workspace ? "📁" : "🏠"}</span>
+        <span className="max-w-[140px] truncate">{label}</span>
+        <span className="text-zinc-500">{open ? "▴" : "▾"}</span>
       </button>
 
       {open && (
-        <div className="absolute left-3 right-3 top-full z-30 mt-1 rounded-lg border border-ink-500 bg-ink-800 p-3 shadow-xl shadow-black/40">
+        <div className="absolute bottom-full left-0 z-30 mb-1 w-80 rounded-lg border border-ink-500 bg-ink-800 p-3 shadow-xl shadow-black/40">
           <div className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500">
             Set project folder
           </div>

@@ -2,6 +2,17 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.5] — 2026-06-25 — "Navy polish"
+
+### Changed
+- The Inspector pane now starts collapsed; open it from the status bar when needed.
+- The project picker moved from a full-width top bar into the composer strip,
+  next to Mode and Model.
+
+### Fixed
+- Release builds now emit signed updater artifacts (`bundle.createUpdaterArtifacts`),
+  so each release ships `latest.json` + `.sig` and the in-app auto-updater works.
+
 ## [0.9.4] — 2026-06-25 — "Navy"
 
 ### Changed
