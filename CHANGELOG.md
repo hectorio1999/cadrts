@@ -2,6 +2,15 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.7] — 2026-06-25 — "Files in chat"
+
+### Added
+- **Atlas can hand you files, photos, and videos in chat.** When Atlas produces a file it
+  delivers it inline — images render, videos play in a built-in player, and other files show a
+  download button. Served by the agent-server (`GET /api/files/:id`, range-enabled for video),
+  staged with the new `share` command. Up to 200 MB/file; shared files expire after ~14 days.
+  Outbound complement to v0.9.6's image attachments.
+
 ## [0.9.6] — 2026-06-25 — "Image attachments"
 
 ### Added
