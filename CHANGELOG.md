@@ -2,6 +2,15 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.8] — 2026-06-26 — "Live streaming"
+
+### Added
+- **Assistant replies stream token-by-token.** Atlas's text now appears as it's
+  generated rather than in per-block chunks, via Claude Code's
+  `--include-partial-messages`. The client renders live token deltas into the
+  active message and de-duplicates the final assistant block. Server kill-switch:
+  `ATLAS_STREAM_PARTIALS=0`. (RTS-113 Part A)
+
 ## [0.9.7] — 2026-06-25 — "Files in chat"
 
 ### Added
