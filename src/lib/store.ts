@@ -68,6 +68,7 @@ type State = {
   appendUserMessage: (text: string, images?: string[]) => string; // returns the new user message id
   beginAssistantMessage: () => string;          // returns the new assistant message id
   appendAssistantText: (msgId: string, delta: string) => void;
+  streamAssistantDelta: (msgId: string, delta: string) => void; // token delta; also marks `streamed`
   upsertToolRun: (msgId: string, run: ToolRun) => void;
   completeToolRun: (toolUseId: string, content: unknown, isError: boolean) => void;
   finishAssistantMessage: (msgId: string) => void;
@@ -210,6 +211,13 @@ export const useStore = create<State>((set, get) => ({
     set((s) => ({
       messages: s.messages.map((m) =>
         m.id === msgId ? { ...m, text: m.text + delta } : m,
+      ),
+    })),
+
+  streamAssistantDelta: (msgId, delta) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === msgId ? { ...m, text: m.text + delta, streamed: true } : m,
       ),
     })),
 
@@ -375,10 +383,13 @@ function routeEvent(s: ReturnType<typeof useStore.getState>, ev: AgentEvent) {
       let activeId =
         s.messages.findLast?.((m) => m.role === "assistant" && !m.done)?.id ?? null;
       if (!activeId) activeId = s.beginAssistantMessage();
+      // If token deltas already streamed this message's text (RTS-113), the
+      // final assistant text block duplicates it — skip text, keep tool_use.
+      const active = s.messages.find((m) => m.id === activeId);
 
       for (const block of msg.content as ContentBlock[]) {
         if (block.type === "text") {
-          s.appendAssistantText(activeId, block.text);
+          if (!active?.streamed) s.appendAssistantText(activeId, block.text);
         } else if (block.type === "tool_use") {
           s.upsertToolRun(activeId, {
             tool_use_id: block.id,
@@ -403,6 +414,23 @@ function routeEvent(s: ReturnType<typeof useStore.getState>, ev: AgentEvent) {
             Boolean(block.is_error),
           );
         }
+      }
+      return;
+    }
+    case "stream_event": {
+      // Token-level streaming (--include-partial-messages, RTS-113). Render
+      // text_delta tokens live into the active assistant bubble; ignore
+      // thinking/signature/input_json deltas and message/block framing.
+      const inner = ev.event;
+      if (
+        inner?.type === "content_block_delta" &&
+        inner.delta?.type === "text_delta" &&
+        inner.delta.text
+      ) {
+        let activeId =
+          s.messages.findLast?.((m) => m.role === "assistant" && !m.done)?.id ?? null;
+        if (!activeId) activeId = s.beginAssistantMessage();
+        s.streamAssistantDelta(activeId, inner.delta.text);
       }
       return;
     }

@@ -70,6 +70,16 @@ export type AgentEvent =
     }
   | { type: "rate_limit_event"; rate_limit_info?: unknown }
   | {
+      // Fine-grained token deltas (when --include-partial-messages is on).
+      // The nested `event` is Anthropic's streaming event; we render text_delta.
+      type: "stream_event";
+      event?: {
+        type?: string; // e.g. "content_block_delta"
+        index?: number;
+        delta?: { type?: string; text?: string }; // text_delta carries the token in `text`
+      } | null;
+    }
+  | {
       type: "result";
       subtype?: string | null;
       is_error?: boolean | null;
@@ -79,7 +89,6 @@ export type AgentEvent =
       num_turns?: number | null;
       terminal_reason?: string | null;
     }
-  | { type: "stream_event" }
   | { type: "other" };
 
 export type TurnOutcome = {
@@ -143,6 +152,9 @@ export type ChatMessage = {
   images?: string[];
   // Has the streaming finished for this message?
   done: boolean;
+  // True once token deltas (stream_event/text_delta) have streamed into `text`,
+  // so the duplicate final `assistant` text block is suppressed (RTS-113).
+  streamed?: boolean;
   ts: number;
 };
 

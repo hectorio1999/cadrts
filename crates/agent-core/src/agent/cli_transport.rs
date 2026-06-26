@@ -231,6 +231,15 @@ impl AgentTransport for CliTransport {
                 cmd.arg("--model").arg(model.trim());
             }
         }
+        // Word-level streaming (RTS-113): emit `stream_event` token deltas so
+        // clients can render assistant text as it's generated instead of in
+        // per-block chunks. Parsed as `AgentEvent::StreamEvent` and forwarded
+        // verbatim; the web/Tauri client renders `text_delta`s and suppresses
+        // the duplicate final assistant block. Env kill-switch (no rebuild):
+        // `ATLAS_STREAM_PARTIALS=0`.
+        if std::env::var("ATLAS_STREAM_PARTIALS").map(|v| v != "0").unwrap_or(true) {
+            cmd.arg("--include-partial-messages");
+        }
 
         if let Some(home) = &creds_home {
             // Both names — the CLI's underlying Node `os.homedir()` reads
