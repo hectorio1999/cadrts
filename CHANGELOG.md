@@ -2,6 +2,16 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.6] — 2026-06-25 — "Image attachments"
+
+### Added
+- **Attach images in the composer.** A new paperclip button — plus clipboard
+  paste and drag-and-drop — lets you send images to Atlas. Files upload to the
+  agent-server (`POST /api/uploads`) and Atlas views them with its Read tool.
+  Thumbnails show in the composer and on the sent message. Up to 6 images per
+  message, 12 MB each (PNG/JPEG/GIF/WEBP). Remote/browser mode only — the file
+  has to live on the server so the agent can read it.
+
 ## [0.9.5] — 2026-06-25 — "Navy polish"
 
 ### Changed
