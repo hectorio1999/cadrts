@@ -65,7 +65,7 @@ type State = {
   dismissToast: (id: string) => void;
 
   // Mutations called from ChatPane/Composer.
-  appendUserMessage: (text: string) => string; // returns the new user message id
+  appendUserMessage: (text: string, images?: string[]) => string; // returns the new user message id
   beginAssistantMessage: () => string;          // returns the new assistant message id
   appendAssistantText: (msgId: string, delta: string) => void;
   upsertToolRun: (msgId: string, run: ToolRun) => void;
@@ -184,12 +184,12 @@ export const useStore = create<State>((set, get) => ({
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
-  appendUserMessage: (text) => {
+  appendUserMessage: (text, images) => {
     const id = uuid();
     set((s) => ({
       messages: [
         ...s.messages,
-        { id, role: "user", text, tools: [], done: true, ts: Date.now() },
+        { id, role: "user", text, tools: [], images, done: true, ts: Date.now() },
       ],
     }));
     return id;

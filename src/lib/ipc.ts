@@ -214,11 +214,19 @@ async function useLocalDb(): Promise<boolean> {
   }
 }
 
+/** Resolve the agent-server base URL + bearer for direct HTTP calls. Remote
+ *  transport uses the configured base/token; browser (and local fallback) use
+ *  the same-origin server + stored bearer. */
+async function resolveServer(): Promise<{ base: string; token: string }> {
+  const t = (await getConfig()).transport;
+  if (t.mode === "remote") {
+    return { base: t.base_url.replace(/\/$/, ""), token: t.token };
+  }
+  return { base: apiOrigin(), token: getBearerToken() };
+}
+
 async function serverApi<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const cfg = await getConfig();
-  const t = cfg.transport;
-  const base = t.mode === "remote" ? t.base_url.replace(/\/$/, "") : apiOrigin();
-  const token = t.mode === "remote" ? t.token : getBearerToken();
+  const { base, token } = await resolveServer();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${base}${path}`, {
@@ -233,6 +241,40 @@ async function serverApi<T>(method: string, path: string, body?: unknown): Promi
   const ct = res.headers.get("content-type") ?? "";
   if (ct.includes("application/json")) return res.json() as Promise<T>;
   return (await res.text()) as unknown as T;
+}
+
+/**
+ * Upload a composer image attachment to the agent-server. Returns the absolute
+ * server path to reference in the prompt ("Read <path>"). Remote/browser only —
+ * the file must live on the server's filesystem so the per-turn agent can read
+ * it. Local (Tauri) transport has no server, so we surface a clear error.
+ */
+export async function uploadImage(
+  bytes: Uint8Array,
+  name: string,
+  mime: string,
+): Promise<{ path: string; filename: string; bytes: number }> {
+  if (await useLocalDb()) {
+    throw new Error(
+      "Image attachments need Remote mode — the file has to live on the agent-server so Atlas can read it.",
+    );
+  }
+  const { base, token } = await resolveServer();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(
+    `${base}/api/uploads?name=${encodeURIComponent(name)}`,
+    {
+      method: "POST",
+      headers,
+      body: new Blob([bytes], { type: mime || "application/octet-stream" }),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${text || res.statusText}`);
+  }
+  return res.json() as Promise<{ path: string; filename: string; bytes: number }>;
 }
 
 export async function listJobs(): Promise<JobView[]> {

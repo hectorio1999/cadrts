@@ -9,6 +9,7 @@ use agent_core::cron::{self, Job, RunRecord};
 use agent_core::db::{self, MessageRow, SessionRow};
 use agent_core::memory::{self, Skill};
 use agent_core::paths;
+use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -250,6 +251,123 @@ pub async fn cancel_turn(
         false
     };
     Json(CancelResp { cancelled })
+}
+
+// -------------------- uploads (chat image attachments) --------------------
+
+/// Hard ceiling enforced in the handler. The route also carries a
+/// `DefaultBodyLimit` (axum's default is 2 MB) set a little above this so an
+/// oversize image yields a clean 413 here rather than a generic body-limit 413.
+const MAX_UPLOAD_BYTES: usize = 12 * 1024 * 1024;
+/// Staged attachments older than this are swept on the next upload.
+const UPLOAD_TTL_DAYS: u64 = 14;
+
+#[derive(Deserialize)]
+pub struct UploadQuery {
+    /// Original client filename — echoed back for display only; never used to
+    /// build the on-disk path (the server names files itself).
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct UploadResp {
+    /// Absolute path on the server. The caller references this in the prompt so
+    /// the per-turn `claude` reads it with its Read tool.
+    pub path: String,
+    pub filename: String,
+    pub bytes: usize,
+}
+
+/// Stage a composer image attachment on the server's filesystem.
+///
+/// Raw image bytes in the body, optional `?name=` for display. The file lands
+/// in `uploads_dir()` (inside the unit's `ReadWritePaths`) where the per-turn
+/// `claude` child can read it — ProtectHome=read-only still permits reads. The
+/// server names the file itself (`up-<uuid>.<ext>`), so a hostile client
+/// filename can't traverse out of the directory.
+pub async fn upload_image(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Query(q): Query<UploadQuery>,
+    body: Bytes,
+) -> Result<Json<UploadResp>, (StatusCode, String)> {
+    if body.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "empty upload".into()));
+    }
+    if body.len() > MAX_UPLOAD_BYTES {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!(
+                "image too large ({} bytes; max {} MB)",
+                body.len(),
+                MAX_UPLOAD_BYTES / (1024 * 1024)
+            ),
+        ));
+    }
+    let ext = sniff_image_ext(&body).ok_or((
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        "unsupported file type — only PNG, JPEG, GIF, and WEBP images are accepted".to_string(),
+    ))?;
+
+    let dir = paths::uploads_dir().map_err(internal)?;
+    std::fs::create_dir_all(&dir).map_err(|e| internal(anyhow::anyhow!(e)))?;
+    prune_old_uploads(&dir, UPLOAD_TTL_DAYS);
+
+    let filename = format!("up-{}.{ext}", uuid::Uuid::new_v4());
+    let path = dir.join(&filename);
+    std::fs::write(&path, &body).map_err(|e| internal(anyhow::anyhow!(e)))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(Json(UploadResp {
+        path: path.to_string_lossy().into_owned(),
+        filename: q.name.unwrap_or(filename),
+        bytes: body.len(),
+    }))
+}
+
+/// Magic-byte sniff → canonical extension for the image types we accept.
+/// Trusting the bytes (not the client-declared content-type) keeps a
+/// mislabelled or hostile upload from landing with the wrong extension.
+fn sniff_image_ext(b: &[u8]) -> Option<&'static str> {
+    if b.len() >= 8 && b[..8] == [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
+        return Some("png");
+    }
+    if b.len() >= 3 && b[..3] == [0xFF, 0xD8, 0xFF] {
+        return Some("jpg");
+    }
+    if b.len() >= 6 && (&b[..6] == b"GIF87a" || &b[..6] == b"GIF89a") {
+        return Some("gif");
+    }
+    if b.len() >= 12 && &b[..4] == b"RIFF" && &b[8..12] == b"WEBP" {
+        return Some("webp");
+    }
+    None
+}
+
+/// Best-effort sweep of attachments older than `ttl_days`. Cheap (the dir only
+/// holds chat images) and never fails the request.
+fn prune_old_uploads(dir: &std::path::Path, ttl_days: u64) {
+    let ttl = std::time::Duration::from_secs(ttl_days * 24 * 60 * 60);
+    let now = std::time::SystemTime::now();
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in rd.flatten() {
+        let Ok(meta) = entry.metadata() else { continue };
+        if !meta.is_file() {
+            continue;
+        }
+        if let Ok(modified) = meta.modified() {
+            if now.duration_since(modified).map(|age| age > ttl).unwrap_or(false) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
 }
 
 // -------------------- sessions / persistence --------------------

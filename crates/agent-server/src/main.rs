@@ -29,6 +29,7 @@ mod stream;
 mod version;
 
 use anyhow::{Context, Result};
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, patch, post};
 use axum::Router;
 use std::net::SocketAddr;
@@ -72,6 +73,12 @@ async fn main() -> Result<()> {
         .route("/auth/probe", post(api::auth_probe))
         .route("/turns", post(api::start_turn))
         .route("/turns/:turn_id", delete(api::cancel_turn))
+        // Image attachments. Raw-bytes body, so lift the 2 MB default body
+        // limit on just this route (handler enforces the real 12 MB ceiling).
+        .route(
+            "/uploads",
+            post(api::upload_image).layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
+        )
         .route("/sessions", get(api::list_sessions))
         .route("/sessions/:id", patch(api::rename_session).delete(api::delete_session))
         .route("/sessions/:id/messages", get(api::load_messages))

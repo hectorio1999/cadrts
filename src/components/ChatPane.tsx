@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { cancelTurn, startTurn } from "../lib/ipc";
+import { cancelTurn, startTurn, uploadImage } from "../lib/ipc";
 import { useStore } from "../lib/store";
 import { v4 as uuid } from "../lib/uuid";
 import { PERMISSION_MODES, ALL_TOOLS, MODELS } from "../lib/prefs";
@@ -9,6 +9,13 @@ import MessageItem from "./MessageItem";
 import WorkspaceBar from "./WorkspaceBar";
 import SkillLibrary from "./SkillLibrary";
 import LiveActivity from "./LiveActivity";
+
+// A pending composer image attachment. `url` is an object URL for the
+// thumbnail; `bytes` is what we POST to the server on send.
+type Attachment = { id: string; name: string; mime: string; url: string; bytes: Uint8Array };
+const MAX_ATTACHMENTS = 6;
+const MAX_ATTACH_BYTES = 12 * 1024 * 1024; // mirrors the server's per-file cap
+const IMAGE_MIME = /^image\/(png|jpe?g|gif|webp)$/i;
 
 export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const messages = useStore((s) => s.messages);
@@ -23,13 +30,17 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
   const workspace = useStore((s) => s.workspace);
   const prefs = useStore((s) => s.prefs);
   const setPrefs = useStore((s) => s.setPrefs);
+  const pushToast = useStore((s) => s.pushToast);
 
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [pendingSkill, setPendingSkill] = useState<WorkflowSkill | null>(null);
   const [skillLibraryOpen, setSkillLibraryOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -61,17 +72,109 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
     setAtBottom(true);
   }
 
+  // ---- image attachments ----
+
+  async function addFiles(files: FileList | File[]) {
+    const incoming = Array.from(files).filter((f) => IMAGE_MIME.test(f.type));
+    if (!incoming.length) return;
+    const room = MAX_ATTACHMENTS - attachments.length;
+    if (room <= 0) {
+      pushToast("info", `Up to ${MAX_ATTACHMENTS} images per message.`);
+      return;
+    }
+    const next: Attachment[] = [];
+    for (const f of incoming.slice(0, room)) {
+      if (f.size > MAX_ATTACH_BYTES) {
+        pushToast("error", `${f.name || "image"} is too large (max 12 MB).`);
+        continue;
+      }
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      next.push({
+        id: uuid(),
+        name: f.name || "image",
+        mime: f.type,
+        url: URL.createObjectURL(f),
+        bytes,
+      });
+    }
+    if (next.length) setAttachments((a) => [...a, ...next]);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((a) => {
+      const hit = a.find((x) => x.id === id);
+      if (hit) URL.revokeObjectURL(hit.url);
+      return a.filter((x) => x.id !== id);
+    });
+  }
+
+  function onPaste(e: React.ClipboardEvent) {
+    const imgs = Array.from(e.clipboardData?.items ?? [])
+      .filter((it) => it.kind === "file" && IMAGE_MIME.test(it.type))
+      .map((it) => it.getAsFile())
+      .filter((f): f is File => !!f);
+    if (imgs.length) {
+      e.preventDefault();
+      void addFiles(imgs);
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    void addFiles(e.dataTransfer.files);
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    if (Array.from(e.dataTransfer?.types ?? []).includes("Files")) e.preventDefault();
+  }
+
   async function onSubmit() {
     const text = input.trim();
-    if (!text || streaming) return;
+    const atts = attachments;
+    if ((!text && atts.length === 0) || streaming || uploading) return;
+
+    // Stage attachments on the server first. The file has to land before the
+    // turn so the agent can Read it. If any upload fails, keep the composer
+    // intact (caption + thumbnails) so the user can retry.
+    let uploadedPaths: string[] = [];
+    if (atts.length) {
+      setUploading(true);
+      try {
+        const results = await Promise.all(
+          atts.map((a) => uploadImage(a.bytes, a.name, a.mime)),
+        );
+        uploadedPaths = results.map((r) => r.path);
+      } catch (e) {
+        setUploading(false);
+        pushToast("error", `Image upload failed: ${String(e).slice(0, 200)}`);
+        return;
+      }
+      setUploading(false);
+    }
+
     setInput("");
+    setAttachments([]); // object URLs now belong to the rendered message
     jumpToBottom(); // sending is an explicit signal — follow the new turn
-    // The transcript shows what the user typed; a selected workflow skill rides
-    // in `skill_directive` so it never pollutes the visible history OR the
-    // keyword-skill matching the server runs against the raw prompt.
-    appendUserMessage(text);
+
+    // The transcript shows what the user typed (+ thumbnails); a selected
+    // workflow skill rides in `skill_directive` so it never pollutes the
+    // visible history OR the keyword-skill matching the server runs.
+    appendUserMessage(text, atts.length ? atts.map((a) => a.url) : undefined);
     const directive = pendingSkill ? asDirective(pendingSkill) : null;
     setPendingSkill(null);
+
+    // Prompt the agent receives: caption + a Read directive for each staged
+    // image (same pattern the Telegram relay uses).
+    let prompt = text;
+    if (uploadedPaths.length) {
+      const list = uploadedPaths.map((p) => p).join("\n");
+      const plural = uploadedPaths.length > 1;
+      const note =
+        `[The user attached ${uploadedPaths.length} image${plural ? "s" : ""}, ` +
+        `saved on the server. View ${plural ? "each" : "it"} with your Read tool:\n${list}]`;
+      prompt = text ? `${text}\n\n${note}` : note;
+    }
 
     // "Allowed tools" checkboxes are a withhold control: unchecked tools are
     // disallowed (the real restriction), checked ones are auto-approved.
@@ -85,7 +188,7 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
       await startTurn(
         {
           turn_id: turnId,
-          prompt: text,
+          prompt,
           skill_directive: directive,
           resume_session_id: session.claude_session_id ?? null,
           permission_mode: prefs.permissionMode,
@@ -198,19 +301,74 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
             <span className="text-amber-400/80">⚠ no confirmation gating</span>
           )}
         </div>
-        <div className="flex items-end gap-1.5 rounded-2xl border border-ink-600 bg-ink-700/30 pl-1.5 pr-1.5 py-1.5 transition-colors focus-within:border-accent/50">
+        {attachments.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachments.map((a) => (
+              <div key={a.id} className="relative">
+                <img
+                  src={a.url}
+                  alt={a.name}
+                  className="h-16 w-16 rounded border border-ink-500 object-cover"
+                />
+                <button
+                  onClick={() => removeAttachment(a.id)}
+                  title="Remove"
+                  className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-ink-500 bg-ink-800 text-[11px] text-zinc-300 hover:bg-ink-700 hover:text-zinc-100"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          className="flex items-end gap-1.5 rounded-2xl border border-ink-600 bg-ink-700/30 pl-1.5 pr-1.5 py-1.5 transition-colors focus-within:border-accent/50"
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) void addFiles(e.target.files);
+              e.target.value = ""; // allow re-selecting the same file
+            }}
+          />
           <button
             onClick={() => setSkillLibraryOpen(true)}
-            disabled={streaming}
+            disabled={streaming || uploading}
             title="Browse the skill library"
             className="flex-none w-9 h-9 grid place-items-center rounded-full text-lg text-zinc-400 hover:bg-ink-600/50 hover:text-zinc-200 disabled:opacity-40"
           >
             +
           </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
+            title="Attach image"
+            className="flex-none w-9 h-9 grid place-items-center rounded-full text-zinc-400 hover:bg-ink-600/50 hover:text-zinc-200 disabled:opacity-40"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[18px] w-[18px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
           <textarea
             ref={taRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={onPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -218,9 +376,13 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
               }
             }}
             placeholder={
-              streaming ? "Atlas is working — Stop or wait…" : "Give Atlas a task…"
+              uploading
+                ? "Uploading image…"
+                : streaming
+                  ? "Atlas is working — Stop or wait…"
+                  : "Give Atlas a task… (paste or drop an image)"
             }
-            disabled={streaming}
+            disabled={streaming || uploading}
             className="flex-1 resize-none bg-transparent px-1.5 py-1.5 text-base md:text-sm text-zinc-100 leading-relaxed placeholder:text-zinc-500"
             rows={1}
           />
@@ -235,11 +397,11 @@ export default function ChatPane({ onOpenSidebar }: { onOpenSidebar: () => void 
           ) : (
             <button
               onClick={onSubmit}
-              disabled={!input.trim()}
+              disabled={uploading || (!input.trim() && attachments.length === 0)}
               title="Send (Enter)"
               className="flex-none w-9 h-9 grid place-items-center rounded-full bg-accent text-ink-900 font-semibold disabled:opacity-30 transition-opacity"
             >
-              ↑
+              {uploading ? <span className="text-xs">…</span> : "↑"}
             </button>
           )}
         </div>

@@ -8,6 +8,19 @@ export default function MessageItem({ message }: { message: ChatMessage }) {
     return (
       <div className="group flex justify-end">
         <div className="relative max-w-[80%] rounded-lg border border-accent/40 px-3 py-2 text-sm font-mono whitespace-pre-wrap text-zinc-100">
+          {message.images && message.images.length > 0 && (
+            <div className="mb-2 flex flex-wrap justify-end gap-2">
+              {message.images.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noreferrer">
+                  <img
+                    src={src}
+                    alt={`attachment ${i + 1}`}
+                    className="max-h-40 max-w-[12rem] rounded border border-ink-500 object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
           {message.text}
           <div className="pointer-events-none absolute -bottom-4 right-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
             <CopyButton text={message.text} />

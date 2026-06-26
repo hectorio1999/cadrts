@@ -138,6 +138,9 @@ export type ChatMessage = {
   text: string;
   // Tool runs surfaced inline in this assistant message.
   tools: ToolRun[];
+  // Image attachments on a user message — object URLs for live thumbnails.
+  // Session-only (not persisted) to keep base64 out of SQLite.
+  images?: string[];
   // Has the streaming finished for this message?
   done: boolean;
   ts: number;
