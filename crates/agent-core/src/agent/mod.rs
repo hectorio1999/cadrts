@@ -13,6 +13,7 @@
 pub mod cli_transport;
 pub mod events;
 pub mod remote_transport;
+pub mod warm_transport;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
