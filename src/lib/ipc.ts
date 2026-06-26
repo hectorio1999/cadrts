@@ -277,6 +277,35 @@ export async function uploadImage(
   return res.json() as Promise<{ path: string; filename: string; bytes: number }>;
 }
 
+/**
+ * Build a direct `GET /api/files/:id` URL with the bearer carried in the query
+ * string (the server accepts `?token=`). Used for `<video>`/`<img>` `src`,
+ * which can't set an Authorization header. `download` flips the server to an
+ * attachment disposition.
+ */
+export async function fileUrl(id: string, opts?: { download?: boolean }): Promise<string> {
+  const { base, token } = await resolveServer();
+  const q = new URLSearchParams();
+  if (opts?.download) q.set("download", "1");
+  if (token) q.set("token", token);
+  const qs = q.toString();
+  return `${base}/api/files/${encodeURIComponent(id)}${qs ? `?${qs}` : ""}`;
+}
+
+/**
+ * Fetch a shared file with the bearer in the Authorization header and return a
+ * blob object URL. Preferred for images + downloads (keeps the token out of the
+ * URL); video uses `fileUrl` directly so range/streaming works.
+ */
+export async function fetchFileObjectUrl(id: string): Promise<string> {
+  const { base, token } = await resolveServer();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${base}/api/files/${encodeURIComponent(id)}`, { headers });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return URL.createObjectURL(await res.blob());
+}
+
 export async function listJobs(): Promise<JobView[]> {
   const r = await serverApi<JobView[]>("GET", "/api/jobs");
   // Defensive: a misrouted request (e.g. Local mode hitting the SPA) could

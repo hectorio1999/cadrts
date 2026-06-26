@@ -79,6 +79,8 @@ async fn main() -> Result<()> {
             "/uploads",
             post(api::upload_image).layer(DefaultBodyLimit::max(16 * 1024 * 1024)),
         )
+        // Outbound files Atlas shares back to the user (image/video/file).
+        .route("/files/:id", get(api::download_file))
         .route("/sessions", get(api::list_sessions))
         .route("/sessions/:id", patch(api::rename_session).delete(api::delete_session))
         .route("/sessions/:id/messages", get(api::load_messages))

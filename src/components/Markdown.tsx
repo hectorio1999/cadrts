@@ -9,6 +9,7 @@
 import Markdown from "markdown-to-jsx";
 import type { MouseEvent, ReactNode } from "react";
 import CodeBlock from "./CodeBlock";
+import FileCard from "./FileCard";
 import { openExternal } from "../lib/openExternal";
 
 /** Flatten a ReactNode tree to its text content (for code extraction). */
@@ -40,6 +41,9 @@ function PreBlock({ children }: { children?: ReactNode }) {
   const inner = children as { props?: { className?: string; children?: ReactNode } } | undefined;
   const lang = inner?.props?.className?.replace(/^lang-/, "") || "";
   const text = nodeToString(inner?.props?.children ?? children).replace(/\n$/, "");
+  // A `cad-file` fence is a file Atlas shared (RTS-110) — render it as a
+  // file/image/video card instead of a code block.
+  if (lang === "cad-file") return <FileCard raw={text} />;
   return <CodeBlock code={text} lang={lang} />;
 }
 

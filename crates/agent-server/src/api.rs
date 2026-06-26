@@ -9,11 +9,13 @@ use agent_core::cron::{self, Job, RunRecord};
 use agent_core::db::{self, MessageRow, SessionRow};
 use agent_core::memory::{self, Skill};
 use agent_core::paths;
-use axum::body::Bytes;
-use axum::extract::{Path, Query, State};
+use axum::body::{Body, Bytes};
+use axum::extract::{Path, Query, Request, State};
 use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+use tower::ServiceExt;
+use tower_http::services::ServeFile;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{broadcast, oneshot};
@@ -368,6 +370,63 @@ fn prune_old_uploads(dir: &std::path::Path, ttl_days: u64) {
             }
         }
     }
+}
+
+// -------------------- downloads (outbound files Atlas shares) --------------------
+
+/// Serve a file Atlas staged for the user via the `share` CLI (RTS-110).
+///
+/// The file lives at `outbox/<id>/<filename>`. We delegate to tower-http's
+/// `ServeFile`, which sets the content-type from the extension and — crucially
+/// for video — honours HTTP `Range` requests so the player can seek and stream
+/// instead of buffering the whole file. `?download=1` flips the disposition to
+/// an attachment so the browser saves rather than renders.
+///
+/// Auth: `Authed` accepts the bearer via header OR `?token=`, so an `<img>` /
+/// `<video>` `src` (which can't set an Authorization header) still authenticates.
+pub async fn download_file(
+    _auth: Authed,
+    State(_state): State<Arc<ServerState>>,
+    Path(id): Path<String>,
+    req: Request<Body>,
+) -> Result<Response, (StatusCode, String)> {
+    // `id` comes from the URL — allow only uuid characters so it can't escape
+    // the outbox directory.
+    if id.is_empty() || id.len() > 64 || !id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-') {
+        return Err((StatusCode::BAD_REQUEST, "invalid file id".into()));
+    }
+    let dir = paths::outbox_dir().map_err(internal)?.join(&id);
+    let file = std::fs::read_dir(&dir)
+        .ok()
+        .and_then(|rd| {
+            rd.flatten()
+                .map(|e| e.path())
+                .find(|p| p.is_file())
+        })
+        .ok_or((StatusCode::NOT_FOUND, "no such file".into()))?;
+
+    let download = req
+        .uri()
+        .query()
+        .map(|q| q.split('&').any(|kv| kv == "download=1"))
+        .unwrap_or(false);
+    let fname = file
+        .file_name()
+        .map(|n| n.to_string_lossy().replace(['"', '\\', '\r', '\n'], "_"))
+        .unwrap_or_else(|| "download".into());
+
+    let mut resp = ServeFile::new(&file)
+        .oneshot(req)
+        .await
+        .map_err(internal)?
+        .into_response();
+    if download {
+        if let Ok(v) = format!("attachment; filename=\"{fname}\"").parse() {
+            resp.headers_mut()
+                .insert(axum::http::header::CONTENT_DISPOSITION, v);
+        }
+    }
+    Ok(resp)
 }
 
 // -------------------- sessions / persistence --------------------

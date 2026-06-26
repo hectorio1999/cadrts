@@ -58,6 +58,14 @@ pub fn uploads_dir() -> Result<PathBuf> {
     Ok(app_home()?.join("uploads"))
 }
 
+/// Outbound files Atlas hands back to the user in chat (RTS-110). The `share`
+/// CLI stages each as `outbox/<id>/<filename>` from inside a turn (this dir is
+/// inside the unit's `ReadWritePaths`); the server serves them at
+/// `GET /api/files/:id`.
+pub fn outbox_dir() -> Result<PathBuf> {
+    Ok(app_home()?.join("outbox"))
+}
+
 /// Scheduled-automation ("cron job") definitions live here as `<id>.json`
 /// files — created by the agent with its file tools and by the jobs API, read
 /// by the server-side scheduler. Run history lives in the `.runs/` subdir.
@@ -81,6 +89,7 @@ pub fn ensure_layout() -> Result<()> {
     std::fs::create_dir_all(jobs_dir()?)?;
     std::fs::create_dir_all(job_runs_dir()?)?;
     std::fs::create_dir_all(uploads_dir()?)?;
+    std::fs::create_dir_all(outbox_dir()?)?;
 
     // Refresh the base skill library every boot — these are app-owned and
     // versioned with the binary. User-created skills live under skills/ (not
