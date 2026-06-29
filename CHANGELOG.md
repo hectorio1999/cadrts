@@ -2,6 +2,16 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.10] — 2026-06-29 — "Calm tool calls"
+
+### Changed
+- **Tool calls render as a compact activity list instead of a stack of cards.**
+  Each call is a quiet one-line row (status · tool · args) under a subtle
+  gutter; click to expand its input/output. A large batch — like a health check
+  firing 25 probes — collapses behind a one-line summary ("N tool calls · M
+  failed") so the transcript stays scannable. Matches the Claude Code feel.
+  (RTS-116)
+
 ## [0.9.9] — 2026-06-29 — "Fluid streaming"
 
 ### Changed
