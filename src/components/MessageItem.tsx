@@ -2,6 +2,7 @@ import type { ChatMessage } from "../lib/types";
 import ToolCallCard from "./ToolCallCard";
 import MarkdownView from "./Markdown";
 import CopyButton from "./CopyButton";
+import { useSmoothText } from "../lib/useSmoothText";
 
 export default function MessageItem({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
@@ -30,9 +31,15 @@ export default function MessageItem({ message }: { message: ChatMessage }) {
     );
   }
 
-  // Assistant. Text renders as markdown; tool runs follow underneath. Text and
-  // tool_use blocks alternate upstream, but rendering text-then-tools keeps the
-  // UI calm and readable.
+  return <AssistantMessage message={message} />;
+}
+
+// Assistant. Text renders as markdown; tool runs follow underneath. Text and
+// tool_use blocks alternate upstream, but rendering text-then-tools keeps the
+// UI calm and readable. While the turn is live, `useSmoothText` meters the
+// reveal so streamed text flows at an even cadence instead of bursting in.
+function AssistantMessage({ message }: { message: ChatMessage }) {
+  const shownText = useSmoothText(message.text, !message.done);
   return (
     <div className="group flex">
       <div className="min-w-0 flex-1 max-w-[92%]">
@@ -45,7 +52,7 @@ export default function MessageItem({ message }: { message: ChatMessage }) {
             </span>
           )}
         </div>
-        {message.text && <MarkdownView>{message.text}</MarkdownView>}
+        {shownText && <MarkdownView>{shownText}</MarkdownView>}
         {message.tools.length > 0 && (
           <div className="mt-2 space-y-2">
             {message.tools.map((t) => (
