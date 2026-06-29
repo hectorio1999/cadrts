@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../lib/types";
-import ToolCallCard from "./ToolCallCard";
+import ToolGroup from "./ToolCallCard";
 import MarkdownView from "./Markdown";
 import CopyButton from "./CopyButton";
 import { useSmoothText } from "../lib/useSmoothText";
@@ -54,10 +54,8 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
         </div>
         {shownText && <MarkdownView>{shownText}</MarkdownView>}
         {message.tools.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {message.tools.map((t) => (
-              <ToolCallCard key={t.tool_use_id} run={t} />
-            ))}
+          <div className="mt-2">
+            <ToolGroup runs={message.tools} />
           </div>
         )}
       </div>

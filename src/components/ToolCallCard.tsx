@@ -4,48 +4,91 @@ import { useStore } from "../lib/store";
 import CopyButton from "./CopyButton";
 
 /**
- * Collapsible inline card for a single tool_use → tool_result pair.
- * Click the header to expand. While the call is in flight we show a pulsing
- * dot; when the result arrives we render input + output. File-mutating tools
- * (Edit/Write/MultiEdit) get a diff/content preview instead of raw JSON.
+ * Renders an assistant message's tool calls as a quiet, compact activity list
+ * (Claude Code / Claude-desktop feel) instead of a stack of full-width cards.
+ * A short run shows its rows directly under a subtle left gutter; a long run —
+ * e.g. a health check firing 25 probes — collapses behind a one-line summary so
+ * the transcript stays scannable. Each row expands on click to reveal I/O, and
+ * clicking also selects the run in the inspector for a full drill-in.
  */
-export default function ToolCallCard({ run }: { run: ToolRun }) {
+const COLLAPSE_THRESHOLD = 5;
+
+export default function ToolGroup({ runs }: { runs: ToolRun[] }) {
+  // Default: small groups open, large groups collapsed. `userOpen` lets a click
+  // override the default and stick — including while the run streams in and
+  // grows past the threshold, so a big batch tucks itself away live instead of
+  // unrolling into a wall.
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  if (runs.length === 0) return null;
+
+  const many = runs.length > COLLAPSE_THRESHOLD;
+  const open = userOpen ?? !many;
+  const failed = runs.reduce((n, r) => n + (r.is_error === true ? 1 : 0), 0);
+  const running = runs.some((r) => r.ended_at == null);
+
+  return (
+    <div className="border-l border-ink-600/60 pl-2.5">
+      {many && (
+        <button
+          onClick={() => setUserOpen(!open)}
+          className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs text-zinc-400 hover:bg-ink-600/30"
+        >
+          <span
+            className={`h-1.5 w-1.5 flex-none rounded-full ${
+              running ? "bg-accent pulse-dot" : failed ? "bg-red-400" : "bg-emerald-400"
+            }`}
+          />
+          <span className="font-medium text-zinc-300">{runs.length} tool calls</span>
+          {failed > 0 && <span className="text-red-400">· {failed} failed</span>}
+          {running && <span className="italic text-zinc-500">· running…</span>}
+          <span className="ml-auto flex-none text-zinc-600">{open ? "▾" : "▸"}</span>
+        </button>
+      )}
+      {open && (
+        <div className="space-y-px">
+          {runs.map((run) => (
+            <ToolRow key={run.tool_use_id} run={run} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One tool_use → tool_result pair as a compact, borderless row. The header is
+ *  a single line (status dot · tool name · truncated args); expanding shows the
+ *  input and output, with a diff/content preview for file-mutating tools. */
+function ToolRow({ run }: { run: ToolRun }) {
   const [open, setOpen] = useState(false);
   const selectToolRun = useStore((s) => s.selectToolRun);
   const done = run.ended_at != null;
   const errored = run.is_error === true;
 
   return (
-    <div
-      className={`rounded border font-mono text-xs ${
-        errored
-          ? "border-red-500/40 bg-red-500/5"
-          : done
-          ? "border-ink-500 bg-ink-700/30"
-          : "border-accent/40 bg-accent/5"
-      }`}
-    >
+    <div>
       <button
-        className="flex w-full items-center justify-between px-3 py-2 hover:bg-ink-600/30"
+        className="group flex w-full items-center gap-2 rounded px-1.5 py-1 text-left font-mono text-xs hover:bg-ink-600/30"
         onClick={() => {
           setOpen((o) => !o);
           selectToolRun(run.tool_use_id);
         }}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className={`h-1.5 w-1.5 flex-none rounded-full ${
-              done ? (errored ? "bg-red-400" : "bg-emerald-400") : "bg-accent pulse-dot"
-            }`}
-          />
-          <span className="flex-none font-semibold text-zinc-200">{run.name}</span>
-          <span className="truncate text-zinc-500">{summarize(run.input)}</span>
-        </div>
-        <span className="flex-none text-zinc-500">{open ? "▾" : "▸"}</span>
+        <span
+          className={`h-1.5 w-1.5 flex-none rounded-full ${
+            done ? (errored ? "bg-red-400" : "bg-emerald-400") : "bg-accent pulse-dot"
+          }`}
+        />
+        <span className="flex-none font-sans font-medium text-zinc-300">{run.name}</span>
+        <span className={`truncate ${errored ? "text-red-300/80" : "text-zinc-500"}`}>
+          {summarize(run.input)}
+        </span>
+        <span className="ml-auto flex-none text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100">
+          {open ? "▾" : "▸"}
+        </span>
       </button>
 
       {open && (
-        <div className="space-y-2 border-t border-ink-500 px-3 py-2">
+        <div className="space-y-2 px-1.5 pb-2 pt-1 font-mono">
           <ToolInput run={run} />
           {done && (
             <div>
