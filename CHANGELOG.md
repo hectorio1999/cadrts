@@ -2,6 +2,16 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.9] — 2026-06-29 — "Fluid streaming"
+
+### Changed
+- **Streamed replies now flow smoothly instead of arriving in bursts.** Token
+  deltas come off the network in clumps; the client now meters them onto the
+  screen at an even, typewriter cadence — the way ChatGPT and the Claude apps
+  read — decoupled from bursty network arrival. Pure presentation: the message
+  text is unchanged, and it snaps to full instantly when the turn ends or when
+  the OS prefers reduced motion. (RTS-115)
+
 ## [0.9.8] — 2026-06-26 — "Live streaming"
 
 ### Added
