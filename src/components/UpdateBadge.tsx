@@ -45,37 +45,53 @@ async function tauriCheckAndInstall(
   }
 }
 
+// Desktop-only: ask the Tauri updater whether the GitHub release feed has a
+// newer signed build than the one running. Returns the new version string, or
+// null if current / unavailable. This is the REAL signal for desktop updates —
+// the server's source-vs-build delta (/api/version) says nothing about which
+// release is published.
+async function checkNativeUpdate(): Promise<string | null> {
+  try {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const update = await check();
+    return update ? update.version : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Bottom-right floating "update available" badge.
  *
- * What it shows:
- *   - A pulsing accent dot when the server reports its source tree is
- *     ahead of its build commit (i.e. somebody pushed new code that the
- *     running server hasn't picked up yet).
- *   - Clicking opens a modal with the last 10 commits + how many more
- *     exist beyond what's listed, plus an "Update now" button.
+ * Two independent signals can light it up:
+ *   - **Desktop (Tauri):** the updater feed has a newer signed release than the
+ *     installed app. "Update now" downloads + verifies the bundle and relaunches.
+ *   - **Browser:** the agent-server's source tree is ahead of its build commit
+ *     (someone pushed code the running server hasn't picked up). "Update now"
+ *     hard-reloads to pick up the freshly served bundle.
  *
- * What "Update now" does:
- *   - Browser: hard-reloads the page. If the agent-server has redeployed,
- *     the new bundle is served immediately.
- *   - Tauri desktop: tells the user to restart the desktop binary. A real
- *     Tauri updater plugin (downloads a new binary) is a follow-up.
+ * Historically only the second signal existed, so a published desktop release
+ * never surfaced in the app — the native updater was reachable only by clicking
+ * a button that never appeared (RTS-117). The desktop check below fixes that.
  *
- * Polling cadence: 60s. The /api/version endpoint is unauth'd so the badge
- * can come alive even before the user signs in (browser mode).
+ * Polling cadence: /api/version every 60s; the desktop feed every 15 min (it
+ * hits GitHub, and releases are infrequent). Both run an immediate first tick,
+ * so the badge can appear right after launch.
  */
 export default function UpdateBadge() {
+  const tauri = isTauri();
   const [version, setVersion] = useState<VersionInfo | null>(null);
+  const [nativeVersion, setNativeVersion] = useState<string | null>(null);
   const [changelog, setChangelog] = useState<ChangelogResponse | null>(null);
   const [open, setOpen] = useState(false);
 
+  // Server source-vs-build delta (browser badge + the "what's new" commit list).
   useEffect(() => {
     let alive = true;
     async function tick() {
       try {
         const v = await getVersion();
-        if (!alive) return;
-        setVersion(v);
+        if (alive) setVersion(v);
       } catch {
         // ignore — server might still be booting; we'll retry
       }
@@ -88,10 +104,28 @@ export default function UpdateBadge() {
     };
   }, []);
 
-  // Pull the changelog when the badge becomes "active" or when the user opens it.
+  // Desktop release feed — the real trigger for desktop updates.
   useEffect(() => {
-    if (!version) return;
-    if (!version.update_available && !open) return;
+    if (!tauri) return;
+    let alive = true;
+    async function tick() {
+      const v = await checkNativeUpdate();
+      if (alive) setNativeVersion(v);
+    }
+    tick();
+    const id = setInterval(tick, 15 * 60_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [tauri]);
+
+  const serverWants = !!version?.update_available;
+  const active = serverWants || nativeVersion != null;
+
+  // Pull the changelog when the badge becomes active or the user opens it.
+  useEffect(() => {
+    if (!active && !open) return;
     let alive = true;
     getChangelog()
       .then((c) => alive && setChangelog(c))
@@ -99,24 +133,28 @@ export default function UpdateBadge() {
     return () => {
       alive = false;
     };
-  }, [version, open]);
+  }, [active, open]);
 
-  if (!version) return null;
-  if (!version.update_available && !open) {
+  if (!active && !open) {
     // No badge when we're current. Keep DOM clean.
     return null;
   }
+
+  const chip = nativeVersion ?? (version && version.commits_ahead > 0 ? `+${version.commits_ahead}` : null);
+  const title = nativeVersion
+    ? `Desktop update ${nativeVersion} available — click to install`
+    : `${version?.commits_ahead ?? 0} change${version?.commits_ahead === 1 ? "" : "s"} available — click to see what's new`;
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        title={`${version.commits_ahead} change${version.commits_ahead === 1 ? "" : "s"} available — click to see what's new`}
+        title={title}
         className="flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 font-mono text-accent hover:bg-accent/20"
       >
-        {version.commits_ahead > 0 && (
+        {chip && (
           <span className="rounded-full bg-accent px-1 text-[9px] font-semibold leading-tight text-ink-900">
-            +{version.commits_ahead}
+            {chip}
           </span>
         )}
         <span>Update</span>
@@ -124,6 +162,7 @@ export default function UpdateBadge() {
       {open && (
         <UpdateModal
           version={version}
+          nativeVersion={nativeVersion}
           changelog={changelog}
           onClose={() => setOpen(false)}
         />
@@ -134,10 +173,12 @@ export default function UpdateBadge() {
 
 function UpdateModal({
   version,
+  nativeVersion,
   changelog,
   onClose,
 }: {
-  version: VersionInfo;
+  version: VersionInfo | null;
+  nativeVersion: string | null;
   changelog: ChangelogResponse | null;
   onClose: () => void;
 }) {
@@ -170,6 +211,12 @@ function UpdateModal({
     );
   }
 
+  const headerSuffix = nativeVersion
+    ? ` · ${nativeVersion}`
+    : version && version.commits_ahead > 0
+    ? ` · +${version.commits_ahead}`
+    : "";
+
   return (
     <div
       className="fixed inset-0 bg-ink-900/80 backdrop-blur-sm z-50 grid place-items-center"
@@ -181,23 +228,26 @@ function UpdateModal({
       >
         <div className="px-4 py-3 border-b border-ink-600 flex items-start justify-between">
           <div>
-            <div className="font-semibold text-zinc-100">
-              What's new{version.commits_ahead > 0 ? ` · +${version.commits_ahead}` : ""}
-            </div>
+            <div className="font-semibold text-zinc-100">What's new{headerSuffix}</div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-              running build{" "}
-              <span className="text-zinc-300">
-                {version.build_commit_short ?? "—"}
-              </span>{" "}
-              · source head{" "}
-              <span className="text-zinc-300">
-                {version.head_commit_short ?? "—"}
-              </span>
-              {version.commits_ahead > 0 && (
+              {nativeVersion ? (
                 <>
-                  {" "}· <span className="text-accent">{version.commits_ahead} new</span>
+                  desktop update <span className="text-accent">{nativeVersion}</span> ready to
+                  install
                 </>
-              )}
+              ) : version ? (
+                <>
+                  running build{" "}
+                  <span className="text-zinc-300">{version.build_commit_short ?? "—"}</span> ·
+                  source head{" "}
+                  <span className="text-zinc-300">{version.head_commit_short ?? "—"}</span>
+                  {version.commits_ahead > 0 && (
+                    <>
+                      {" "}· <span className="text-accent">{version.commits_ahead} new</span>
+                    </>
+                  )}
+                </>
+              ) : null}
             </div>
           </div>
           <button

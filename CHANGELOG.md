@@ -2,6 +2,20 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.11] — 2026-06-29 — "Update discovery fix"
+
+### Fixed
+- **The desktop app now surfaces new releases on its own.** The update badge was
+  driven only by the agent-server's source-vs-build delta, so a freshly
+  published desktop release never lit it up — the native updater was reachable
+  only via a button that never appeared. The desktop app now polls the GitHub
+  release feed directly and shows "Update" when a newer signed build exists.
+  (RTS-117)
+
+> Note: because the previous desktop build still has the old logic, this one
+> update must be installed manually (download the .msi/.dmg from the release).
+> After that, in-app updates surface automatically.
+
 ## [0.9.10] — 2026-06-29 — "Calm tool calls"
 
 ### Changed
