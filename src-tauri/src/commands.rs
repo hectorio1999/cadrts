@@ -284,6 +284,7 @@ pub async fn persist_session(
         &args.title,
         args.claude_session_id.as_deref(),
         args.total_cost_delta,
+        None, // local Tauri sessions are always "desktop"
     )
     .map_err(|e| e.to_string())?;
     let rows: Vec<(i64, String, String)> = args

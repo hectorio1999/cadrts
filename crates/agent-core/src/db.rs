@@ -75,6 +75,19 @@ fn init_schema(conn: &Connection) -> Result<()> {
         END;
         "#,
     )?;
+
+    // Additive migration: `source` tags where a session came from ("desktop",
+    // "telegram", ...) so the sidebar can group platform conversations
+    // Hermes-style. Guarded because ALTER TABLE ADD COLUMN has no IF NOT
+    // EXISTS in SQLite.
+    let has_source = conn
+        .prepare("SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'source'")?
+        .exists([])?;
+    if !has_source {
+        conn.execute_batch(
+            "ALTER TABLE sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'desktop';",
+        )?;
+    }
     Ok(())
 }
 
@@ -87,6 +100,9 @@ pub struct SessionRow {
     pub claude_session_id: Option<String>,
     pub total_cost: f64,
     pub message_count: i64,
+    /// Where the session originated: "desktop" (default) or a platform
+    /// relay tag like "telegram".
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +123,7 @@ pub fn upsert_session(
     title: &str,
     claude_session_id: Option<&str>,
     total_cost_delta: f64,
+    source: Option<&str>,
 ) -> Result<()> {
     let now = chrono::Utc::now().timestamp_millis();
     let existing: Option<(String, f64)> = conn
@@ -124,14 +141,15 @@ pub fn upsert_session(
         } else {
             existing_title.as_str()
         };
+        // `source` is sticky: only overwrite when the caller sends one.
         conn.execute(
-            "UPDATE sessions SET title=?, last_at=?, claude_session_id=COALESCE(?, claude_session_id), total_cost=? WHERE id=?",
-            params![next_title, now, claude_session_id, existing_cost + total_cost_delta, id],
+            "UPDATE sessions SET title=?, last_at=?, claude_session_id=COALESCE(?, claude_session_id), total_cost=?, source=COALESCE(?, source) WHERE id=?",
+            params![next_title, now, claude_session_id, existing_cost + total_cost_delta, source, id],
         )?;
     } else {
         conn.execute(
-            "INSERT INTO sessions (id, title, created_at, last_at, claude_session_id, total_cost) VALUES (?, ?, ?, ?, ?, ?)",
-            params![id, title, now, now, claude_session_id, total_cost_delta],
+            "INSERT INTO sessions (id, title, created_at, last_at, claude_session_id, total_cost, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![id, title, now, now, claude_session_id, total_cost_delta, source.unwrap_or("desktop")],
         )?;
     }
     Ok(())
@@ -164,7 +182,8 @@ pub fn replace_messages(
 pub fn list_sessions(conn: &Connection, limit: i64) -> Result<Vec<SessionRow>> {
     let mut stmt = conn.prepare(
         "SELECT s.id, s.title, s.created_at, s.last_at, s.claude_session_id, s.total_cost,
-                (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id)
+                (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id),
+                s.source
          FROM sessions s
          ORDER BY s.last_at DESC
          LIMIT ?",
@@ -178,6 +197,7 @@ pub fn list_sessions(conn: &Connection, limit: i64) -> Result<Vec<SessionRow>> {
             claude_session_id: r.get(4)?,
             total_cost: r.get(5)?,
             message_count: r.get(6)?,
+            source: r.get(7)?,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -207,6 +227,64 @@ pub fn delete_session(conn: &Connection, id: &str) -> Result<()> {
 pub fn rename_session(conn: &Connection, id: &str, title: &str) -> Result<()> {
     conn.execute("UPDATE sessions SET title=? WHERE id=?", params![title, id])?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mem_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        init_schema(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn session_source_defaults_to_desktop() {
+        let conn = mem_db();
+        upsert_session(&conn, "s1", "Hello", None, 0.0, None).unwrap();
+        let rows = list_sessions(&conn, 10).unwrap();
+        assert_eq!(rows[0].source, "desktop");
+    }
+
+    #[test]
+    fn session_source_telegram_roundtrip_and_sticky() {
+        let conn = mem_db();
+        upsert_session(&conn, "tg1", "TG chat", Some("csid"), 0.0, Some("telegram")).unwrap();
+        let rows = list_sessions(&conn, 10).unwrap();
+        assert_eq!(rows[0].source, "telegram");
+
+        // A later upsert WITHOUT a source (e.g. desktop client re-persisting
+        // after the user continues the chat there) must not clobber the tag.
+        upsert_session(&conn, "tg1", "TG chat", None, 0.01, None).unwrap();
+        let rows = list_sessions(&conn, 10).unwrap();
+        assert_eq!(rows[0].source, "telegram");
+        assert_eq!(rows[0].claude_session_id.as_deref(), Some("csid"));
+    }
+
+    #[test]
+    fn migration_adds_source_to_preexisting_table() {
+        // Simulate a state.sqlite created before the `source` column existed.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT 'New session',
+                created_at INTEGER NOT NULL,
+                last_at INTEGER NOT NULL,
+                claude_session_id TEXT,
+                model TEXT,
+                total_cost REAL NOT NULL DEFAULT 0
+            );
+            INSERT INTO sessions (id, title, created_at, last_at) VALUES ('old', 'Old', 1, 1);",
+        )
+        .unwrap();
+        init_schema(&conn).unwrap(); // must ALTER, not fail
+        init_schema(&conn).unwrap(); // and stay idempotent
+        let rows = list_sessions(&conn, 10).unwrap();
+        assert_eq!(rows[0].id, "old");
+        assert_eq!(rows[0].source, "desktop");
+    }
 }
 
 pub fn search(conn: &Connection, query: &str, limit: i64) -> Result<Vec<MessageRow>> {

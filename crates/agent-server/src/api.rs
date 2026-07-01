@@ -445,6 +445,10 @@ pub struct PersistSessionBody {
     pub claude_session_id: Option<String>,
     pub total_cost_delta: f64,
     pub messages: Vec<PersistMessage>,
+    /// Origin tag ("desktop", "telegram", ...). Optional so pre-existing
+    /// clients keep working; absent = leave/insert as "desktop".
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 pub async fn persist_session(
@@ -460,6 +464,7 @@ pub async fn persist_session(
         &body.title,
         body.claude_session_id.as_deref(),
         body.total_cost_delta,
+        body.source.as_deref(),
     )
     .map_err(internal)?;
     let rows: Vec<(i64, String, String)> = body

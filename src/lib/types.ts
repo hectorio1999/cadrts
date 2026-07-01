@@ -191,6 +191,9 @@ export type SessionRow = {
   claude_session_id: string | null;
   total_cost: number;
   message_count: number;
+  /** "desktop" | "telegram" | future platform tags. Optional so an older
+   *  local binary that doesn't send it still type-checks. */
+  source?: string;
 };
 
 export type MessageRow = {

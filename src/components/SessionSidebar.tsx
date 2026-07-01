@@ -60,6 +60,10 @@ export default function SessionSidebar({
   const filtered = q
     ? sessionList.filter((r) => r.title.toLowerCase().includes(q))
     : sessionList;
+  // Platform split: Telegram-relayed conversations get their own section
+  // (Hermes-style); everything else stays under SESSIONS.
+  const desktopSessions = filtered.filter((r) => (r.source ?? "desktop") !== "telegram");
+  const telegramSessions = filtered.filter((r) => r.source === "telegram");
 
   const sortedJobs = [...jobs].sort(
     (a, b) => (a.next_run ?? Infinity) - (b.next_run ?? Infinity),
@@ -113,7 +117,7 @@ export default function SessionSidebar({
       </div>
 
       {/* SESSIONS section */}
-      <SectionHeader label="Sessions" count={filtered.length}>
+      <SectionHeader label="Sessions" count={desktopSessions.length}>
         <button
           onClick={() => refreshSessions()}
           className="text-zinc-500 hover:text-zinc-300"
@@ -123,12 +127,12 @@ export default function SessionSidebar({
         </button>
       </SectionHeader>
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {filtered.length === 0 ? (
+        {desktopSessions.length === 0 ? (
           <div className="px-2 py-3 text-xs text-zinc-500 italic">
             {q ? "No sessions match." : "No past sessions yet. They appear here after the first turn finishes."}
           </div>
         ) : (
-          filtered.map((row) => (
+          desktopSessions.map((row) => (
             <SessionRowItem
               key={row.id}
               row={row}
@@ -143,6 +147,31 @@ export default function SessionSidebar({
           ))
         )}
       </div>
+
+      {/* TELEGRAM section — conversations mirrored by the tg-atlas relay.
+          Click to open the transcript; sending a message continues the same
+          Claude session from the desktop. */}
+      {telegramSessions.length > 0 && (
+        <div className="border-t border-ink-600">
+          <SectionHeader label="Telegram" count={telegramSessions.length} />
+          <div className="max-h-44 overflow-y-auto px-2 pb-2">
+            {telegramSessions.map((row) => (
+              <SessionRowItem
+                key={row.id}
+                row={row}
+                badge="✈"
+                isActive={row.id === session.id}
+                disabled={streaming}
+                onOpen={() => {
+                  openSession(row.id);
+                  onClose();
+                }}
+                onAfterMutate={() => refreshSessions()}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* CRON JOBS section */}
       <div className="border-t border-ink-600">
@@ -239,12 +268,13 @@ function JobRowItem({ job, onClick }: { job: JobView; onClick: () => void }) {
 
 function SessionRowItem(props: {
   row: { id: string; title: string; last_at: number; message_count: number };
+  badge?: string;
   isActive: boolean;
   disabled: boolean;
   onOpen: () => void;
   onAfterMutate: () => void;
 }) {
-  const { row, isActive, disabled, onOpen, onAfterMutate } = props;
+  const { row, badge, isActive, disabled, onOpen, onAfterMutate } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(row.title);
 
@@ -290,7 +320,10 @@ function SessionRowItem(props: {
             className="flex-1 bg-ink-900/60 border border-ink-500 rounded px-1 py-0.5 text-zinc-100"
           />
         ) : (
-          <span className="text-zinc-100 truncate">{row.title}</span>
+          <span className="text-zinc-100 truncate">
+            {badge && <span className="mr-1.5 text-accent/70">{badge}</span>}
+            {row.title}
+          </span>
         )}
         <button
           onClick={onDelete}
