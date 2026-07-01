@@ -392,7 +392,7 @@ pub async fn download_file(
 ) -> Result<Response, (StatusCode, String)> {
     // `id` comes from the URL — allow only uuid characters so it can't escape
     // the outbox directory.
-    if id.is_empty() || id.len() > 64 || !id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-') {
+    if !valid_file_id(&id) {
         return Err((StatusCode::BAD_REQUEST, "invalid file id".into()));
     }
     let dir = paths::outbox_dir().map_err(internal)?.join(&id);
@@ -603,6 +603,15 @@ fn validate_skill_name(name: &str) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
+/// Whether a `/api/files/:id` path segment is a safe outbox id: non-empty,
+/// bounded, and only uuid characters (hex + `-`) so it cannot traverse out of
+/// the outbox directory. Extracted from `download_file` so it is unit-testable.
+fn valid_file_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-')
+}
+
 fn internal<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
 }
@@ -731,3 +740,48 @@ fn _hint(_: AuthStatus) {}
 fn _hint2(_: TurnOutcome) {}
 #[allow(dead_code)]
 fn _hint3(_: oneshot::Sender<()>) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skill_name_rejects_traversal_and_dotfiles() {
+        for bad in ["", "../secret", "a/b", "a\\b", "with.dot", "ads:stream", "nul\0byte", ".."] {
+            assert!(validate_skill_name(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+
+    #[test]
+    fn skill_name_accepts_plain_stems() {
+        for ok in ["style", "infra-map", "ventures", "batch_pipeline", "test-bundle"] {
+            assert!(validate_skill_name(ok).is_ok(), "should accept {ok:?}");
+        }
+    }
+
+    #[test]
+    fn file_id_accepts_uuid_shapes() {
+        assert!(valid_file_id("550e8400-e29b-41d4-a716-446655440000"));
+        assert!(valid_file_id("abc123"));
+    }
+
+    #[test]
+    fn file_id_rejects_traversal_and_oversize() {
+        assert!(!valid_file_id(""));
+        assert!(!valid_file_id("../etc/passwd"));
+        assert!(!valid_file_id("a/b"));
+        assert!(!valid_file_id("with.dot"));
+        assert!(!valid_file_id("space here"));
+        assert!(!valid_file_id(&"a".repeat(65)));
+    }
+
+    #[test]
+    fn sniff_image_ext_matches_magic_bytes() {
+        assert_eq!(sniff_image_ext(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]), Some("png"));
+        assert_eq!(sniff_image_ext(&[0xFF, 0xD8, 0xFF, 0x00]), Some("jpg"));
+        assert_eq!(sniff_image_ext(b"GIF89a....."), Some("gif"));
+        assert_eq!(sniff_image_ext(b"RIFF\0\0\0\0WEBP...."), Some("webp"));
+        assert_eq!(sniff_image_ext(b"not-an-image"), None);
+        assert_eq!(sniff_image_ext(&[]), None);
+    }
+}

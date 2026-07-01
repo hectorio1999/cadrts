@@ -1,0 +1,56 @@
+name: CI
+
+# Build + test gate for the server-side crates and the web bundle. The existing
+# desktop-release.yml only builds the Tauri app on a tag; nothing verified the
+# internet-facing `agent-server` (auth, file serving, cron) or ran the tests.
+# This runs on every push/PR so a regression in the security-load-bearing code
+# (auth token extraction, path-traversal guards, cron scheduling) fails CI
+# before it can be deployed.
+#
+# Security follow-up (audit H8): pin these actions to full commit SHAs. Left as
+# floating tags here because this workflow holds no secrets; the *release*
+# workflow, which does, is the priority for SHA-pinning.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rust:
+    name: rust (build + test + clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      # Build + test only the headless crates. src-tauri needs GTK/WebKit system
+      # deps and is covered by desktop-release.yml.
+      - name: build agent-server
+        run: cargo build -p agent-server --locked
+      - name: test workspace crates
+        run: cargo test -p agent-core -p agent-server --locked
+      - name: clippy (informational)
+        run: cargo clippy -p agent-core -p agent-server --locked
+
+  web:
+    name: web (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: typecheck + build web bundle
+        run: npm run build:web

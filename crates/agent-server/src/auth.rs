@@ -113,3 +113,73 @@ fn extract_token(parts: &Parts) -> Option<String> {
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Request;
+
+    /// Build request `Parts` from a list of headers + an optional query string.
+    fn parts(headers: &[(&str, &str)], query: Option<&str>) -> Parts {
+        let uri = match query {
+            Some(q) => format!("/ws/stream/abc?{q}"),
+            None => "/ws/stream/abc".to_string(),
+        };
+        let mut b = Request::builder().uri(uri);
+        for (k, v) in headers {
+            b = b.header(*k, *v);
+        }
+        b.body(()).unwrap().into_parts().0
+    }
+
+    #[test]
+    fn ct_eq_matches_only_identical_bytes() {
+        assert!(ct_eq(b"hunter2", b"hunter2"));
+        assert!(!ct_eq(b"hunter2", b"hunter3"));
+        assert!(!ct_eq(b"short", b"longer-token"));
+        assert!(!ct_eq(b"", b"x"));
+        assert!(ct_eq(b"", b""));
+    }
+
+    #[test]
+    fn extract_prefers_authorization_header() {
+        let p = parts(&[("authorization", "Bearer tok-abc")], None);
+        assert_eq!(extract_token(&p).as_deref(), Some("tok-abc"));
+    }
+
+    #[test]
+    fn extract_trims_and_rejects_empty_bearer() {
+        let p = parts(&[("authorization", "Bearer   ")], None);
+        // Whitespace-only after the prefix is not a token; fall through to None.
+        assert_eq!(extract_token(&p), None);
+    }
+
+    #[test]
+    fn extract_reads_websocket_subprotocol() {
+        let p = parts(&[("sec-websocket-protocol", "bearer, tok-ws")], None);
+        assert_eq!(extract_token(&p).as_deref(), Some("tok-ws"));
+    }
+
+    #[test]
+    fn extract_websocket_marker_order_insensitive() {
+        let p = parts(&[("sec-websocket-protocol", "tok-ws, bearer")], None);
+        assert_eq!(extract_token(&p).as_deref(), Some("tok-ws"));
+    }
+
+    #[test]
+    fn extract_falls_back_to_query_token() {
+        let p = parts(&[], Some("download=1&token=tok-q"));
+        assert_eq!(extract_token(&p).as_deref(), Some("tok-q"));
+    }
+
+    #[test]
+    fn extract_header_beats_query() {
+        let p = parts(&[("authorization", "Bearer tok-hdr")], Some("token=tok-q"));
+        assert_eq!(extract_token(&p).as_deref(), Some("tok-hdr"));
+    }
+
+    #[test]
+    fn extract_none_when_absent() {
+        assert_eq!(extract_token(&parts(&[], None)), None);
+    }
+}

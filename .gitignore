@@ -31,6 +31,12 @@ Thumbs.db
 probes/
 seed/
 
+# Internal audit — same reason as seed/probes: contains RTS-specific topology,
+# credential-file paths, privilege model, and concrete attack scenarios. This
+# repo's remote is PUBLIC (github.com/hectorio1999/cadrts) so these must never
+# be pushed. They live locally + in the Claude tenant agent workspace.
+docs/audit/
+
 # Build/test artifacts
 *.tar.gz
 *.log
