@@ -2,6 +2,16 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.12] — 2026-07-01 — "Telegram in the sidebar"
+
+### Added
+- **Telegram conversations now appear in the sidebar** under their own
+  TELEGRAM section (RTS-118). Sessions carry a `source` tag
+  (`desktop`/`telegram`); the tg-atlas relay mirrors each chat's transcript
+  into the session store after every exchange. Opening a Telegram session
+  shows the full history — and sending a message continues that same
+  conversation from the desktop.
+
 ## [0.9.11] — 2026-06-29 — "Update discovery fix"
 
 ### Fixed
