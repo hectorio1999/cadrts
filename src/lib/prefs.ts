@@ -50,7 +50,7 @@ export const MODELS: { value: string; label: string; hint: string }[] = [
   { value: "", label: "Default", hint: "Whatever your plan uses by default (currently Fable 5)." },
   { value: "claude-fable-5", label: "Fable 5", hint: "The default frontier model." },
   { value: "opus", label: "Opus", hint: "Most capable — best for hard reasoning and code." },
-  { value: "sonnet", label: "Sonnet", hint: "Balanced speed and capability." },
+  { value: "claude-sonnet-5", label: "Sonnet 5", hint: "Balanced speed and capability — latest Sonnet. (The bare `sonnet` alias on the box CLI still resolves to 4.6.)" },
   { value: "haiku", label: "Haiku", hint: "Fastest and cheapest — quick tasks." },
 ];
 
