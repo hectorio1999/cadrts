@@ -215,3 +215,22 @@ input, textarea { outline: none; }
   text-align: left;
 }
 .cad-md th { background: rgb(var(--ink-700)); color: rgb(var(--tx-300)); font-weight: 600; }
+
+/* ---------- syntax highlighting (RTS-119) ----------
+   highlight.js token colors tuned for the navy/ink themes. Muted, cool
+   palette with the house cream/gold reserved for keywords — subtle enough
+   for the light themes too (tokens sit on the CodeBlock's dark ink panel
+   regardless of theme). */
+.hljs { color: inherit; background: transparent; }
+.hljs-comment, .hljs-quote { color: #7d8aa8; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-tag { color: #d9c491; }
+.hljs-string, .hljs-regexp, .hljs-addition { color: #9ece8c; }
+.hljs-number, .hljs-literal, .hljs-symbol { color: #d19a66; }
+.hljs-title, .hljs-title.function_, .hljs-section { color: #7fb4e0; }
+.hljs-title.class_, .hljs-type, .hljs-class .hljs-title { color: #e0c285; }
+.hljs-attr, .hljs-attribute, .hljs-property, .hljs-variable, .hljs-template-variable { color: #a8c5e8; }
+.hljs-built_in, .hljs-name { color: #7fd4c8; }
+.hljs-meta, .hljs-doctag, .hljs-params { color: #8a93a8; }
+.hljs-deletion { color: #e08a8a; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
