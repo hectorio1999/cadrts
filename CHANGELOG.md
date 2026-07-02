@@ -2,6 +2,19 @@
 
 All notable changes to Claude Agent Desktop.
 
+## [0.9.13] — 2026-07-01 — "Fluid like ChatGPT"
+
+### Changed
+- **Streaming text v2** (RTS-119): the typewriter reveal is now a
+  rate-matched velocity controller — pace glides with the model's actual
+  output rate instead of surging after every network burst and decaying to
+  a crawl. Frame-rate independent (same feel on 60/120 Hz).
+
+### Added
+- **Syntax highlighting in code blocks** (RTS-119): highlight.js,
+  lazy-loaded so the main bundle is unchanged; ~35 common languages plus
+  PowerShell and Dockerfile; token palette tuned to the navy theme.
+
 ## [0.9.12] — 2026-07-01 — "Telegram in the sidebar"
 
 ### Added
