@@ -46,9 +46,10 @@ fi
 # from the bootstrap). The compiled dist/ lives next to the source tree.
 if command -v npm >/dev/null && [ -f "$DIR/package.json" ]; then
   step "Rebuilding the React web bundle"
-  if [ ! -d "$DIR/node_modules" ]; then
-    sudo -u "$USER_NAME" npm install
-  fi
+  # Always reconcile deps — a pull can add new packages, and a node_modules
+  # that merely *exists* isn't necessarily current (RTS-119 deploy failure).
+  # No-op in a couple of seconds when everything is already installed.
+  sudo -u "$USER_NAME" npm install --no-audit --no-fund
   sudo -u "$USER_NAME" npm run build:web
   ok "dist/ rebuilt"
 fi
